@@ -827,15 +827,14 @@ local function checkbox(parent,text,yp,defaultOn)
         tw(box,T_FAST,{BackgroundColor3=state and themes[config.theme].accent or themes[config.theme].row})
         statusLabel.Text="● "..text..": "..(state and "ON" or "OFF")
     end
-    btn.MouseButton1Click:Connect(toggleCheckbox)
-    btn.Activated:Connect(function() if isMobile then toggleCheckbox() end end)
+    -- Let the caller connect events
 
     local function forceOff()
         if state then overridden = true end
         state = false; chk.Visible = false
         tw(box, T_FAST, {BackgroundColor3 = themes[config.theme].row})
     end
-    return btn, function() return state end, forceOff
+    return btn, function() return state end, forceOff, toggleCheckbox
 end
 
 --====================================================
@@ -1111,29 +1110,33 @@ local function stopPopupBlocker()
     end)
 end
 
-local gemsBtn, getGemsState = checkbox(mainPage,"Gems", 22, false)
-gemsBtn.MouseButton1Click:Connect(function()
-    gemsActive = not gemsActive
+local gemsBtn, getGemsState, _, toggleGemsUI = checkbox(mainPage,"Gems", 22, false)
+
+local function handleGemsToggle()
+    toggleGemsUI()
+    gemsActive = getGemsState()
     if gemsActive then
         statusLabel.Text = "● Gems: FARMING..."
         startPopupBlocker()
         task.spawn(function()
-            while gemsActive do
+            while getGemsState() do
                 pcall(function()
                     local evt = game:GetService("ReplicatedStorage").Events.Tutorial.EndTutorial
                     safeFireServer(evt)
                 end)
                 rWait(gemsSpamDelay)
+                if not getGemsState() then break end
             end
+            gemsActive = false
+            stopPopupBlocker()
+            statusLabel.Text = "● Gems: OFF"
         end)
-    else
-        stopPopupBlocker()
-        statusLabel.Text = "● Gems: OFF"
     end
-end)
--- Touch
-gemsBtn.Activated:Connect(function()
-    if isMobile then gemsBtn.MouseButton1Click:Fire() end
+end
+
+gemsBtn.MouseButton1Click:Connect(handleGemsToggle)
+gemsBtn.Activated:Connect(function() 
+    if isMobile then handleGemsToggle() end 
 end)
 
 local function showNotif(title, message, isError, checkboxRef)
@@ -1179,44 +1182,45 @@ local heartsActive  = false
 local savedPosition = nil
 local heartsChkBox  = nil
 
-local heartsBtn, getHeartsState, heartsForceOff = checkbox(mainPage,"Collect Hearts", 64, false)
+local heartsBtn, getHeartsState, heartsForceOff, toggleHeartsUI = checkbox(mainPage,"Collect Hearts", 64, false)
 heartsChkBox = checkBoxes[#checkBoxes]
 
 local function doHeartsToggle()
-    if heartsActive then
-        heartsActive = false; heartsForceOff()
-        statusLabel.Text = "● Collect Hearts: OFF"; return
-    end
-    local snowflakesFolder = workspace:FindFirstChild("Debris") and workspace.Debris:FindFirstChild("Snowflakes")
-    local count = snowflakesFolder and #snowflakesFolder:GetChildren() or 0
-    if count == 0 then
-        heartsForceOff()
-        showNotif("Collect Hearts", "No snowflakes active in the map!", true)
-        statusLabel.Text = "● Collect Hearts: Nothing found"; return
-    end
-    heartsActive = true
-    local char = Players.LocalPlayer.Character
-    local hrp  = char and char:FindFirstChild("HumanoidRootPart")
-    if hrp then savedPosition = hrp.CFrame end
-    showNotif("Collect Hearts", "Found " .. count .. " snowflakes! Teleporting...", false)
-    statusLabel.Text = "● Collecting " .. count .. " snowflakes..."
-    task.spawn(function()
-        local flakes = snowflakesFolder:GetChildren()
-        for _, flake in ipairs(flakes) do
-            if not heartsActive then break end
-            if flake and flake.Parent then
-                local c = Players.LocalPlayer.Character
-                local h = c and c:FindFirstChild("HumanoidRootPart")
-                if h then h.CFrame = flake.CFrame + Vector3.new(0, 3, 0); task.wait(0.15) end
-            end
+    toggleHeartsUI()
+    if getHeartsState() and not heartsActive then
+        local snowflakesFolder = workspace:FindFirstChild("Debris") and workspace.Debris:FindFirstChild("Snowflakes")
+        local count = snowflakesFolder and #snowflakesFolder:GetChildren() or 0
+        if count == 0 then
+            heartsForceOff()
+            showNotif("Collect Hearts", "No snowflakes active in the map!", true)
+            statusLabel.Text = "● Collect Hearts: Nothing found"; return
         end
-        task.wait(0.2)
-        local c2 = Players.LocalPlayer.Character
-        local h2 = c2 and c2:FindFirstChild("HumanoidRootPart")
-        if h2 and savedPosition then h2.CFrame = savedPosition end
-        heartsActive = false; heartsForceOff()
-        statusLabel.Text = "● Collect Hearts: Done!"
-    end)
+        heartsActive = true
+        local char = Players.LocalPlayer.Character
+        local hrp  = char and char:FindFirstChild("HumanoidRootPart")
+        if hrp then savedPosition = hrp.CFrame end
+        showNotif("Collect Hearts", "Found " .. count .. " snowflakes! Teleporting...", false)
+        statusLabel.Text = "● Collecting " .. count .. " snowflakes..."
+        task.spawn(function()
+            local flakes = snowflakesFolder:GetChildren()
+            for _, flake in ipairs(flakes) do
+                if not getHeartsState() then break end
+                if flake and flake.Parent then
+                    local c = Players.LocalPlayer.Character
+                    local h = c and c:FindFirstChild("HumanoidRootPart")
+                    if h then h.CFrame = flake.CFrame + Vector3.new(0, 3, 0); task.wait(0.15) end
+                end
+            end
+            task.wait(0.2)
+            local c2 = Players.LocalPlayer.Character
+            local h2 = c2 and c2:FindFirstChild("HumanoidRootPart")
+            if h2 and savedPosition then h2.CFrame = savedPosition end
+            heartsActive = false; heartsForceOff()
+            statusLabel.Text = "● Collect Hearts: Done!"
+        end)
+    else
+        heartsActive = false
+    end
 end
 
 heartsBtn.MouseButton1Click:Connect(doHeartsToggle)
@@ -1241,7 +1245,7 @@ local cflyConn     = nil
 local cflyBodyVel  = nil
 local cflyBodyGyro = nil
 
-local cflyBtn, getCflyState, cflyForceOff = checkbox(micsPage, "Fly", 22, false)
+local cflyBtn, getCflyState, cflyForceOff, toggleCflyUI = checkbox(micsPage, "Fly", 22, false)
 
 local function stopCfly()
     cflyActive = false
@@ -1256,7 +1260,8 @@ local function stopCfly()
 end
 
 local function doCflyToggle()
-    cflyActive = not cflyActive
+    toggleCflyUI()
+    cflyActive = getCflyState()
     if cflyActive then
         statusLabel.Text = "● CFly: ON"
         local char = localPlayer.Character
@@ -1307,7 +1312,7 @@ local cwalkActive = false
 local cwalkSpeed  = 32
 local cwalkConn   = nil
 
-local cwalkBtn, getCwalkState, cwalkForceOff = checkbox(micsPage, "Walk", 122, false)
+local cwalkBtn, getCwalkState, cwalkForceOff, toggleCwalkUI = checkbox(micsPage, "Walk", 122, false)
 
 local function stopCwalk()
     cwalkActive = false
@@ -1318,7 +1323,8 @@ local function stopCwalk()
 end
 
 local function doCwalkToggle()
-    cwalkActive = not cwalkActive
+    toggleCwalkUI()
+    cwalkActive = getCwalkState()
     if cwalkActive then
         statusLabel.Text = "● CWalk: ON"
         local char = localPlayer.Character
@@ -1357,10 +1363,11 @@ secLabel(micsPage,"ABILITIES",222)
 local infJumpActive = false
 local infJumpConn   = nil
 
-local infJumpBtn, getInfJumpState, infJumpForceOff = checkbox(micsPage, "Inf Jump", 244, false)
+local infJumpBtn, getInfJumpState, infJumpForceOff, toggleInfJumpUI = checkbox(micsPage, "Inf Jump", 244, false)
 
 local function doInfJumpToggle()
-    infJumpActive = not infJumpActive
+    toggleInfJumpUI()
+    infJumpActive = getInfJumpState()
     if infJumpActive then
         statusLabel.Text = "● Inf Jump: ON"
         infJumpConn = UserInputService.JumpRequest:Connect(function()
