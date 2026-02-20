@@ -798,16 +798,15 @@ local function checkbox(parent,text,yp,defaultOn)
     lbl.TextColor3=t.text; lbl.TextXAlignment=Enum.TextXAlignment.Left; lbl.ZIndex=6
     table.insert(textMain,lbl); table.insert(fontObjs,lbl)
 
-    -- CAMBIO VISUAL MINIMAL: Solo tamaño y TextSize del checkmark
     local box=Instance.new("Frame"); box.Parent=row
-    box.Size=UDim2.new(0,24,0,24); box.Position=UDim2.new(1,-36,0.5,-12)
+    box.Size=UDim2.new(0,22,0,22); box.Position=UDim2.new(1,-34,0.5,-11)
     box.BackgroundColor3=state and t.accent or t.row; box.BorderSizePixel=0; box.ZIndex=6
     local bc2=Instance.new("UICorner",box); bc2.CornerRadius=UDim.new(0,7)
     local bs=Instance.new("UIStroke",box); bs.Color=t.stroke; bs.Transparency=0.7
 
     local chk=Instance.new("TextLabel"); chk.Parent=box
     chk.Size=UDim2.fromScale(1,1); chk.BackgroundTransparency=1
-    chk.Text="✓"; chk.Font=Enum.Font.GothamBold; chk.TextSize=11
+    chk.Text="✓"; chk.Font=Enum.Font.GothamBold; chk.TextSize=13
     chk.TextColor3=t.primary; chk.Visible=state; chk.ZIndex=7
     table.insert(checkBoxes,{box=box,chk=chk,stroke=bs,getState=function() return state end})
 
@@ -829,7 +828,11 @@ local function checkbox(parent,text,yp,defaultOn)
         statusLabel.Text="● "..text..": "..(state and "ON" or "OFF")
     end
     btn.MouseButton1Click:Connect(toggleCheckbox)
-    btn.Activated:Connect(function() if isMobile then toggleCheckbox() end end)
+    if isMobile then
+        btn.TouchTap:Connect(toggleCheckbox)
+    else
+        btn.Activated:Connect(function() toggleCheckbox() end)
+    end
 
     local function forceOff()
         if state then overridden = true end
