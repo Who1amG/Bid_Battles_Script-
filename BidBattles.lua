@@ -1,5 +1,5 @@
 --====================================================
--- WH01 UI — Mobile + PC Friendly
+-- WH01 UI — Mobile + PC Friendly (FIXED CHECKBOX MOBILE)
 --====================================================
 
 local Players          = game:GetService("Players")
@@ -798,43 +798,56 @@ local function checkbox(parent,text,yp,defaultOn)
     lbl.TextColor3=t.text; lbl.TextXAlignment=Enum.TextXAlignment.Left; lbl.ZIndex=6
     table.insert(textMain,lbl); table.insert(fontObjs,lbl)
 
+    -- CHECKBOX BOX — Aumentado de 22 a 24 para mejor visibilidad en mobile
     local box=Instance.new("Frame"); box.Parent=row
-    box.Size=UDim2.new(0,22,0,22); box.Position=UDim2.new(1,-34,0.5,-11)
+    box.Size=UDim2.new(0,24,0,24); box.Position=UDim2.new(1,-36,0.5,-12)
     box.BackgroundColor3=state and t.accent or t.row; box.BorderSizePixel=0; box.ZIndex=6
-    local bc2=Instance.new("UICorner",box); bc2.CornerRadius=UDim.new(0,7)
+    local bc2=Instance.new("UICorner",box); bc2.CornerRadius=UDim.new(0,8)
     local bs=Instance.new("UIStroke",box); bs.Color=t.stroke; bs.Transparency=0.7
 
+    -- CHECKMARK — Reducido de 13 a 11 para que quepa mejor
     local chk=Instance.new("TextLabel"); chk.Parent=box
     chk.Size=UDim2.fromScale(1,1); chk.BackgroundTransparency=1
-    chk.Text="✓"; chk.Font=Enum.Font.GothamBold; chk.TextSize=13
+    chk.Text="✓"; chk.Font=Enum.Font.GothamBold; chk.TextSize=11
     chk.TextColor3=t.primary; chk.Visible=state; chk.ZIndex=7
     table.insert(checkBoxes,{box=box,chk=chk,stroke=bs,getState=function() return state end})
 
     local overridden = false
     local btn=Instance.new("TextButton"); btn.Parent=row
     btn.Size=UDim2.fromScale(1,1); btn.BackgroundTransparency=1; btn.Text=""; btn.ZIndex=8
-    btn.MouseEnter:Connect(function()
-        tw(row,T_FAST,{BackgroundColor3=themes[config.theme].accent, BackgroundTransparency=0.4})
-        tw(lbl,T_FAST,{TextColor3=themes[config.theme].primary})
-    end)
-    btn.MouseLeave:Connect(function()
-        tw(row,T_FAST,{BackgroundColor3=themes[config.theme].row, BackgroundTransparency=0.2})
-        tw(lbl,T_FAST,{TextColor3=themes[config.theme].text})
-    end)
-    local function toggleCheckbox()
+    
+    -- Efectos hover solo para desktop
+    if not isMobile then
+        btn.MouseEnter:Connect(function()
+            tw(row,T_FAST,{BackgroundColor3=themes[config.theme].accent, BackgroundTransparency=0.4})
+            tw(lbl,T_FAST,{TextColor3=themes[config.theme].primary})
+        end)
+        btn.MouseLeave:Connect(function()
+            tw(row,T_FAST,{BackgroundColor3=themes[config.theme].row, BackgroundTransparency=0.2})
+            tw(lbl,T_FAST,{TextColor3=themes[config.theme].text})
+        end)
+        btn.MouseButton1Click:Connect(function()
+            if overridden then overridden=false; return end
+            state=not state; chk.Visible=state
+            tw(box,T_FAST,{BackgroundColor3=state and themes[config.theme].accent or themes[config.theme].row})
+            statusLabel.Text="● "..text..": "..(state and "ON" or "OFF")
+        end)
+    end
+    
+    -- Touch/Activated para mobile (sin hover, más directo)
+    btn.Activated:Connect(function()
         if overridden then overridden=false; return end
         state=not state; chk.Visible=state
         tw(box,T_FAST,{BackgroundColor3=state and themes[config.theme].accent or themes[config.theme].row})
         statusLabel.Text="● "..text..": "..(state and "ON" or "OFF")
-    end
-    -- Let the caller connect events
+    end)
 
     local function forceOff()
         if state then overridden = true end
         state = false; chk.Visible = false
         tw(box, T_FAST, {BackgroundColor3 = themes[config.theme].row})
     end
-    return btn, function() return state end, forceOff, toggleCheckbox
+    return btn, function() return state end, forceOff
 end
 
 --====================================================
@@ -957,20 +970,22 @@ local function slider(parent, labelText, yp, minVal, maxVal, defaultVal, onChang
         end
     end)
 
-    trackBtn.MouseEnter:Connect(function()
-        tw(knob, T_FAST, {Size = UDim2.new(0, KNOB_SIZE+2, 0, KNOB_SIZE+2)})
-        tw(row, T_FAST, {BackgroundColor3=themes[config.theme].accent, BackgroundTransparency=0.4})
-        tw(nameLbl, T_FAST, {TextColor3=themes[config.theme].primary})
-        tw(valLbl, T_FAST, {TextColor3=themes[config.theme].primary})
-    end)
-    trackBtn.MouseLeave:Connect(function()
-        if not activeSlider then
-            tw(knob, T_FAST, {Size = UDim2.new(0, KNOB_SIZE, 0, KNOB_SIZE)})
-            tw(row, T_FAST, {BackgroundColor3=themes[config.theme].row, BackgroundTransparency=0.2})
-            tw(nameLbl, T_FAST, {TextColor3=themes[config.theme].text})
-            tw(valLbl, T_FAST, {TextColor3=themes[config.theme].accent})
-        end
-    end)
+    if not isMobile then
+        trackBtn.MouseEnter:Connect(function()
+            tw(knob, T_FAST, {Size = UDim2.new(0, KNOB_SIZE+2, 0, KNOB_SIZE+2)})
+            tw(row, T_FAST, {BackgroundColor3=themes[config.theme].accent, BackgroundTransparency=0.4})
+            tw(nameLbl, T_FAST, {TextColor3=themes[config.theme].primary})
+            tw(valLbl, T_FAST, {TextColor3=themes[config.theme].primary})
+        end)
+        trackBtn.MouseLeave:Connect(function()
+            if not activeSlider then
+                tw(knob, T_FAST, {Size = UDim2.new(0, KNOB_SIZE, 0, KNOB_SIZE)})
+                tw(row, T_FAST, {BackgroundColor3=themes[config.theme].row, BackgroundTransparency=0.2})
+                tw(nameLbl, T_FAST, {TextColor3=themes[config.theme].text})
+                tw(valLbl, T_FAST, {TextColor3=themes[config.theme].accent})
+            end
+        end)
+    end
 
     return row, function() return currentVal end, updateSlider
 end
@@ -998,18 +1013,21 @@ local function actionButton(parent,text,yp)
     arr.TextSize=14; arr.TextColor3=t.subtext; arr.ZIndex=6
     table.insert(textSub,arr)
 
-    btn.MouseEnter:Connect(function()
-        tw(btn,T_FAST,{BackgroundColor3=themes[config.theme].accent, BackgroundTransparency=0.4})
-        tw(lbl,T_FAST,{TextColor3=themes[config.theme].primary})
-        tw(arr,T_FAST,{TextColor3=themes[config.theme].primary,Position=UDim2.new(1,-23,0.5,-10)})
-    end)
-    btn.MouseLeave:Connect(function()
-        tw(btn,T_FAST,{BackgroundColor3=themes[config.theme].row, BackgroundTransparency=0.2})
-        tw(lbl,T_FAST,{TextColor3=themes[config.theme].text})
-        tw(arr,T_FAST,{TextColor3=themes[config.theme].subtext,Position=UDim2.new(1,-28,0.5,-10)})
-    end)
-    btn.MouseButton1Down:Connect(function() tw(btn,TweenInfo.new(0.1),{Size=UDim2.new(1,-4,0,ROW_H-2)}) end)
-    btn.MouseButton1Up:Connect(function()   tw(btn,TweenInfo.new(0.1),{Size=UDim2.new(1,0,0,ROW_H)}) end)
+    if not isMobile then
+        btn.MouseEnter:Connect(function()
+            tw(btn,T_FAST,{BackgroundColor3=themes[config.theme].accent, BackgroundTransparency=0.4})
+            tw(lbl,T_FAST,{TextColor3=themes[config.theme].primary})
+            tw(arr,T_FAST,{TextColor3=themes[config.theme].primary,Position=UDim2.new(1,-23,0.5,-10)})
+        end)
+        btn.MouseLeave:Connect(function()
+            tw(btn,T_FAST,{BackgroundColor3=themes[config.theme].row, BackgroundTransparency=0.2})
+            tw(lbl,T_FAST,{TextColor3=themes[config.theme].text})
+            tw(arr,T_FAST,{TextColor3=themes[config.theme].subtext,Position=UDim2.new(1,-28,0.5,-10)})
+        end)
+        btn.MouseButton1Down:Connect(function() tw(btn,TweenInfo.new(0.1),{Size=UDim2.new(1,-4,0,ROW_H-2)}) end)
+        btn.MouseButton1Up:Connect(function()   tw(btn,TweenInfo.new(0.1),{Size=UDim2.new(1,0,0,ROW_H)}) end)
+    end
+    
     -- Touch feedback
     btn.TouchLongPress:Connect(function() tw(btn,TweenInfo.new(0.1),{Size=UDim2.new(1,-4,0,ROW_H-2)}) end)
     return btn
@@ -1066,14 +1084,18 @@ local function dropdown(parent,labelText,options,currentVal,yp,onChange)
         ob.AutoButtonColor=false; ob.ZIndex=21
         local obc=Instance.new("UICorner",ob); obc.CornerRadius=UDim.new(0,10)
         table.insert(fontObjs,ob)
-        ob.MouseEnter:Connect(function() tw(ob,T_FAST,{BackgroundTransparency=0.3}) end)
-        ob.MouseLeave:Connect(function() tw(ob,T_FAST,{BackgroundTransparency=(ob.Text==vl.Text) and 0.4 or 0.85}) end)
+        
+        if not isMobile then
+            ob.MouseEnter:Connect(function() tw(ob,T_FAST,{BackgroundTransparency=0.3}) end)
+            ob.MouseLeave:Connect(function() tw(ob,T_FAST,{BackgroundTransparency=(ob.Text==vl.Text) and 0.4 or 0.85}) end)
+        end
+        
         local function selectOpt()
             vl.Text=opt; dl.Visible=false; activeDD=nil; tw(al,T_FAST,{Rotation=0})
             onChange(opt); statusLabel.Text="● "..labelText..": "..opt
         end
         ob.MouseButton1Click:Connect(selectOpt)
-        ob.Activated:Connect(function() if isMobile then selectOpt() end end)
+        ob.Activated:Connect(function() selectOpt() end)
     end
 
     local tb=Instance.new("TextButton"); tb.Parent=mr
@@ -1084,7 +1106,7 @@ local function dropdown(parent,labelText,options,currentVal,yp,onChange)
         tw(al,T_FAST,{Rotation=dl.Visible and 180 or 0})
     end
     tb.MouseButton1Click:Connect(toggleDD)
-    tb.Activated:Connect(function() if isMobile then toggleDD() end end)
+    tb.Activated:Connect(toggleDD)
     return cont
 end
 
@@ -1110,33 +1132,45 @@ local function stopPopupBlocker()
     end)
 end
 
-local gemsBtn, getGemsState, _, toggleGemsUI = checkbox(mainPage,"Gems", 22, false)
-
-local function handleGemsToggle()
-    toggleGemsUI()
-    gemsActive = getGemsState()
+local gemsBtn, getGemsState = checkbox(mainPage,"Gems", 22, false)
+gemsBtn.MouseButton1Click:Connect(function()
+    gemsActive = not gemsActive
     if gemsActive then
         statusLabel.Text = "● Gems: FARMING..."
         startPopupBlocker()
         task.spawn(function()
-            while getGemsState() do
+            while gemsActive do
                 pcall(function()
                     local evt = game:GetService("ReplicatedStorage").Events.Tutorial.EndTutorial
                     safeFireServer(evt)
                 end)
                 rWait(gemsSpamDelay)
-                if not getGemsState() then break end
             end
-            gemsActive = false
-            stopPopupBlocker()
-            statusLabel.Text = "● Gems: OFF"
         end)
+    else
+        stopPopupBlocker()
+        statusLabel.Text = "● Gems: OFF"
     end
-end
-
-gemsBtn.MouseButton1Click:Connect(handleGemsToggle)
-gemsBtn.Activated:Connect(function() 
-    if isMobile then handleGemsToggle() end 
+end)
+-- Touch
+gemsBtn.Activated:Connect(function()
+    gemsActive = not gemsActive
+    if gemsActive then
+        statusLabel.Text = "● Gems: FARMING..."
+        startPopupBlocker()
+        task.spawn(function()
+            while gemsActive do
+                pcall(function()
+                    local evt = game:GetService("ReplicatedStorage").Events.Tutorial.EndTutorial
+                    safeFireServer(evt)
+                end)
+                rWait(gemsSpamDelay)
+            end
+        end)
+    else
+        stopPopupBlocker()
+        statusLabel.Text = "● Gems: OFF"
+    end
 end)
 
 local function showNotif(title, message, isError, checkboxRef)
@@ -1182,49 +1216,48 @@ local heartsActive  = false
 local savedPosition = nil
 local heartsChkBox  = nil
 
-local heartsBtn, getHeartsState, heartsForceOff, toggleHeartsUI = checkbox(mainPage,"Collect Hearts", 64, false)
+local heartsBtn, getHeartsState, heartsForceOff = checkbox(mainPage,"Collect Hearts", 64, false)
 heartsChkBox = checkBoxes[#checkBoxes]
 
 local function doHeartsToggle()
-    toggleHeartsUI()
-    if getHeartsState() and not heartsActive then
-        local snowflakesFolder = workspace:FindFirstChild("Debris") and workspace.Debris:FindFirstChild("Snowflakes")
-        local count = snowflakesFolder and #snowflakesFolder:GetChildren() or 0
-        if count == 0 then
-            heartsForceOff()
-            showNotif("Collect Hearts", "No snowflakes active in the map!", true)
-            statusLabel.Text = "● Collect Hearts: Nothing found"; return
-        end
-        heartsActive = true
-        local char = Players.LocalPlayer.Character
-        local hrp  = char and char:FindFirstChild("HumanoidRootPart")
-        if hrp then savedPosition = hrp.CFrame end
-        showNotif("Collect Hearts", "Found " .. count .. " snowflakes! Teleporting...", false)
-        statusLabel.Text = "● Collecting " .. count .. " snowflakes..."
-        task.spawn(function()
-            local flakes = snowflakesFolder:GetChildren()
-            for _, flake in ipairs(flakes) do
-                if not getHeartsState() then break end
-                if flake and flake.Parent then
-                    local c = Players.LocalPlayer.Character
-                    local h = c and c:FindFirstChild("HumanoidRootPart")
-                    if h then h.CFrame = flake.CFrame + Vector3.new(0, 3, 0); task.wait(0.15) end
-                end
-            end
-            task.wait(0.2)
-            local c2 = Players.LocalPlayer.Character
-            local h2 = c2 and c2:FindFirstChild("HumanoidRootPart")
-            if h2 and savedPosition then h2.CFrame = savedPosition end
-            heartsActive = false; heartsForceOff()
-            statusLabel.Text = "● Collect Hearts: Done!"
-        end)
-    else
-        heartsActive = false
+    if heartsActive then
+        heartsActive = false; heartsForceOff()
+        statusLabel.Text = "● Collect Hearts: OFF"; return
     end
+    local snowflakesFolder = workspace:FindFirstChild("Debris") and workspace.Debris:FindFirstChild("Snowflakes")
+    local count = snowflakesFolder and #snowflakesFolder:GetChildren() or 0
+    if count == 0 then
+        heartsForceOff()
+        showNotif("Collect Hearts", "No snowflakes active in the map!", true)
+        statusLabel.Text = "● Collect Hearts: Nothing found"; return
+    end
+    heartsActive = true
+    local char = Players.LocalPlayer.Character
+    local hrp  = char and char:FindFirstChild("HumanoidRootPart")
+    if hrp then savedPosition = hrp.CFrame end
+    showNotif("Collect Hearts", "Found " .. count .. " snowflakes! Teleporting...", false)
+    statusLabel.Text = "● Collecting " .. count .. " snowflakes..."
+    task.spawn(function()
+        local flakes = snowflakesFolder:GetChildren()
+        for _, flake in ipairs(flakes) do
+            if not heartsActive then break end
+            if flake and flake.Parent then
+                local c = Players.LocalPlayer.Character
+                local h = c and c:FindFirstChild("HumanoidRootPart")
+                if h then h.CFrame = flake.CFrame + Vector3.new(0, 3, 0); task.wait(0.15) end
+            end
+        end
+        task.wait(0.2)
+        local c2 = Players.LocalPlayer.Character
+        local h2 = c2 and c2:FindFirstChild("HumanoidRootPart")
+        if h2 and savedPosition then h2.CFrame = savedPosition end
+        heartsActive = false; heartsForceOff()
+        statusLabel.Text = "● Collect Hearts: Done!"
+    end)
 end
 
 heartsBtn.MouseButton1Click:Connect(doHeartsToggle)
-heartsBtn.Activated:Connect(function() if isMobile then doHeartsToggle() end end)
+heartsBtn.Activated:Connect(doHeartsToggle)
 
 secLabel(mainPage,"ACTIONS",106)
 
@@ -1245,7 +1278,7 @@ local cflyConn     = nil
 local cflyBodyVel  = nil
 local cflyBodyGyro = nil
 
-local cflyBtn, getCflyState, cflyForceOff, toggleCflyUI = checkbox(micsPage, "Fly", 22, false)
+local cflyBtn, getCflyState, cflyForceOff = checkbox(micsPage, "Fly", 22, false)
 
 local function stopCfly()
     cflyActive = false
@@ -1260,8 +1293,7 @@ local function stopCfly()
 end
 
 local function doCflyToggle()
-    toggleCflyUI()
-    cflyActive = getCflyState()
+    cflyActive = not cflyActive
     if cflyActive then
         statusLabel.Text = "● CFly: ON"
         local char = localPlayer.Character
@@ -1302,7 +1334,7 @@ local function doCflyToggle()
 end
 
 cflyBtn.MouseButton1Click:Connect(doCflyToggle)
-cflyBtn.Activated:Connect(function() if isMobile then doCflyToggle() end end)
+cflyBtn.Activated:Connect(doCflyToggle)
 
 slider(micsPage, "Fly Speed", 64, 10, 300, 50, function(val)
     cflySpeed = val; statusLabel.Text = "● Fly Speed: " .. tostring(math.floor(val))
@@ -1312,7 +1344,7 @@ local cwalkActive = false
 local cwalkSpeed  = 32
 local cwalkConn   = nil
 
-local cwalkBtn, getCwalkState, cwalkForceOff, toggleCwalkUI = checkbox(micsPage, "Walk", 122, false)
+local cwalkBtn, getCwalkState, cwalkForceOff = checkbox(micsPage, "Walk", 122, false)
 
 local function stopCwalk()
     cwalkActive = false
@@ -1323,8 +1355,7 @@ local function stopCwalk()
 end
 
 local function doCwalkToggle()
-    toggleCwalkUI()
-    cwalkActive = getCwalkState()
+    cwalkActive = not cwalkActive
     if cwalkActive then
         statusLabel.Text = "● CWalk: ON"
         local char = localPlayer.Character
@@ -1346,7 +1377,7 @@ local function doCwalkToggle()
 end
 
 cwalkBtn.MouseButton1Click:Connect(doCwalkToggle)
-cwalkBtn.Activated:Connect(function() if isMobile then doCwalkToggle() end end)
+cwalkBtn.Activated:Connect(doCwalkToggle)
 
 slider(micsPage, "Walk Speed", 164, 8, 150, 32, function(val)
     cwalkSpeed = val
@@ -1363,11 +1394,10 @@ secLabel(micsPage,"ABILITIES",222)
 local infJumpActive = false
 local infJumpConn   = nil
 
-local infJumpBtn, getInfJumpState, infJumpForceOff, toggleInfJumpUI = checkbox(micsPage, "Inf Jump", 244, false)
+local infJumpBtn, getInfJumpState, infJumpForceOff = checkbox(micsPage, "Inf Jump", 244, false)
 
 local function doInfJumpToggle()
-    toggleInfJumpUI()
-    infJumpActive = getInfJumpState()
+    infJumpActive = not infJumpActive
     if infJumpActive then
         statusLabel.Text = "● Inf Jump: ON"
         infJumpConn = UserInputService.JumpRequest:Connect(function()
@@ -1382,7 +1412,7 @@ local function doInfJumpToggle()
 end
 
 infJumpBtn.MouseButton1Click:Connect(doInfJumpToggle)
-infJumpBtn.Activated:Connect(function() if isMobile then doInfJumpToggle() end end)
+infJumpBtn.Activated:Connect(doInfJumpToggle)
 
 --====================================================
 -- SETTINGS PAGE
@@ -1563,8 +1593,10 @@ for i,data in ipairs(tabData) do
     tbtn.Size=UDim2.fromScale(1,1); tbtn.BackgroundTransparency=1; tbtn.Text=""; tbtn.ZIndex=7
     tabBtns[i]={bg=tbg,lbl=tlbl,ico=tico,isImage=data.isImage}
 
-    tbtn.MouseEnter:Connect(function() if activeTabIdx~=i then tw(tbg,T_FAST,{BackgroundTransparency=0.25}) end end)
-    tbtn.MouseLeave:Connect(function() if activeTabIdx~=i then tw(tbg,T_FAST,{BackgroundTransparency=0.55}) end end)
+    if not isMobile then
+        tbtn.MouseEnter:Connect(function() if activeTabIdx~=i then tw(tbg,T_FAST,{BackgroundTransparency=0.25}) end end)
+        tbtn.MouseLeave:Connect(function() if activeTabIdx~=i then tw(tbg,T_FAST,{BackgroundTransparency=0.55}) end end)
+    end
     tbtn.Activated:Connect(function() switchTab(i) end)
 end
 
@@ -1584,4 +1616,4 @@ updateCanvasSize(mainPage)
 --====================================================
 root.Size=UDim2.new(0,0,0,0)
 tw(root,TweenInfo.new(0.5,Enum.EasingStyle.Back,Enum.EasingDirection.Out),{Size=UDim2.new(0,UI_W,0,UI_H)})
-print("MultiTool UI v6.0 loaded! Mobile:", isMobile)
+print("MultiTool UI v6.0 FIXED loaded! Mobile:", isMobile)
