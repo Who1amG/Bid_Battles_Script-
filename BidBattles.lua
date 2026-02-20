@@ -1,5 +1,5 @@
 --====================================================
--- WH01 UI — Mobile + PC Friendly
+-- WH01 UI
 --====================================================
 
 local Players          = game:GetService("Players")
@@ -10,22 +10,6 @@ local HttpService      = game:GetService("HttpService")
 
 local localPlayer = Players.LocalPlayer
 local PlayerGui   = localPlayer:WaitForChild("PlayerGui")
-
---====================================================
--- MOBILE DETECTION
---====================================================
-local isMobile = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
-
--- Tamaños adaptados
-local UI_W      = isMobile and 340 or 500
-local UI_H      = isMobile and 280 or 390
-local SIDEBAR_W = isMobile and 90  or 118
-local FONT_MAIN = isMobile and 10  or 12
-local FONT_SUB  = isMobile and 9   or 10
-local ROW_H     = isMobile and 32  or 38
-local SLIDER_H  = isMobile and 46  or 54
-local TAB_H     = isMobile and 38  or 44
-local TAB_GAP   = isMobile and 44  or 54
 
 --====================================================
 -- GAME LOCK (obfuscated)
@@ -202,25 +186,18 @@ local contentArea, body
 local bgSection, bgSectionStroke, bgPrefixLbl, bgInput, applyBgBtn
 
 --====================================================
--- SLIDER GLOBAL — separado para Mouse y Touch
+-- FIX 5 — Un solo listener global para sliders
 --====================================================
 local activeSlider = nil
 
--- Función que actualiza el slider dado un X de pantalla
-local function updateSliderFromX(screenX)
-    if not activeSlider then return end
-    local trackAbsPos  = activeSlider.track.AbsolutePosition
-    local trackAbsSize = activeSlider.track.AbsoluteSize
-    local r = math.clamp((screenX - trackAbsPos.X) / trackAbsSize.X, 0, 1)
-    local newVal = activeSlider.minVal + r * (activeSlider.maxVal - activeSlider.minVal)
-    activeSlider.update(newVal, false)
-    statusLabel.Text = "● " .. activeSlider.label .. ": " .. tostring(math.floor(newVal))
-end
-
--- Mouse
 UserInputService.InputChanged:Connect(function(inp)
     if activeSlider and inp.UserInputType == Enum.UserInputType.MouseMovement then
-        updateSliderFromX(inp.Position.X)
+        local trackAbsPos = activeSlider.track.AbsolutePosition
+        local trackAbsSize = activeSlider.track.AbsoluteSize
+        local r = math.clamp((inp.Position.X - trackAbsPos.X) / trackAbsSize.X, 0, 1)
+        local newVal = activeSlider.minVal + r * (activeSlider.maxVal - activeSlider.minVal)
+        activeSlider.update(newVal, false)
+        statusLabel.Text = "● " .. activeSlider.label .. ": " .. tostring(math.floor(newVal))
     end
 end)
 
@@ -230,128 +207,41 @@ UserInputService.InputEnded:Connect(function(inp)
     end
 end)
 
--- Touch (global, para que funcione aunque el dedo salga del slider)
-UserInputService.TouchMoved:Connect(function(touch, gameProcessed)
-    if activeSlider then
-        updateSliderFromX(touch.Position.X)
-    end
-end)
-
-UserInputService.TouchEnded:Connect(function(touch, gameProcessed)
-    if activeSlider then
-        activeSlider = nil
-    end
-end)
-
---====================================================
--- DRAG — Mouse Y Touch, con prioridad a sliders
---====================================================
-local function setupDrag()
-    local dragging   = false
-    local dragStart  = nil
-    local startPos   = nil
-
-    -- Detecta si un punto de pantalla está sobre algún slider
-    local function isOverSlider(screenPos)
-        for _, s in ipairs(sliderObjs) do
-            if s.track and s.track.Parent then
-                local ap = s.track.AbsolutePosition
-                local as = s.track.AbsoluteSize
-                -- zona generosa alrededor del track
-                if screenPos.X >= ap.X - 10 and screenPos.X <= ap.X + as.X + 10 and
-                   screenPos.Y >= ap.Y - 24  and screenPos.Y <= ap.Y + as.Y + 24 then
-                    return true
-                end
-            end
-        end
-        return false
-    end
-
-    -- MOUSE drag
-    root.InputBegan:Connect(function(inp)
-        if inp.UserInputType == Enum.UserInputType.MouseButton1 then
-            if activeSlider then return end
-            if isOverSlider(inp.Position) then return end
-            dragging  = true
-            dragStart = inp.Position
-            startPos  = root.Position
-            local c; c = inp.Changed:Connect(function()
-                if inp.UserInputState == Enum.UserInputState.End then
-                    dragging = false
-                    c:Disconnect()
-                end
-            end)
-        end
-    end)
-
-    UserInputService.InputChanged:Connect(function(inp)
-        if dragging and inp.UserInputType == Enum.UserInputType.MouseMovement then
-            local d = inp.Position - dragStart
-            root.Position = UDim2.new(
-                startPos.X.Scale, startPos.X.Offset + d.X,
-                startPos.Y.Scale, startPos.Y.Offset + d.Y
-            )
-        end
-    end)
-
-    -- TOUCH drag
-    local touchDragId = nil
-
-    root.InputBegan:Connect(function(inp)
-        if inp.UserInputType == Enum.UserInputType.Touch then
-            -- Si hay un slider activo, no iniciar drag
-            if activeSlider then return end
-            if isOverSlider(inp.Position) then return end
-
-            touchDragId = inp
-            dragging    = true
-            dragStart   = inp.Position
-            startPos    = root.Position
-        end
-    end)
-
-    root.InputChanged:Connect(function(inp)
-        if dragging and inp == touchDragId and inp.UserInputType == Enum.UserInputType.Touch then
-            if activeSlider then
-                -- si mientras draggeas activaste un slider, cancela el drag
-                dragging    = false
-                touchDragId = nil
-                return
-            end
-            local d = inp.Position - dragStart
-            root.Position = UDim2.new(
-                startPos.X.Scale, startPos.X.Offset + d.X,
-                startPos.Y.Scale, startPos.Y.Offset + d.Y
-            )
-        end
-    end)
-
-    root.InputEnded:Connect(function(inp)
-        if inp == touchDragId then
-            dragging    = false
-            touchDragId = nil
-        end
-    end)
-end
-
 --====================================================
 -- PARTICLES
 --====================================================
 local pFlakes, pConn, pContainer = {}, nil, nil
 
 local function clearParticles()
-    if pConn then pConn:Disconnect(); pConn = nil end
+    if pConn then
+        pConn:Disconnect()
+        pConn = nil
+    end
+
     for _,f in ipairs(pFlakes) do
         if f and f.Parent then
-            TweenService:Create(f, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {TextTransparency=1}):Play()
-            task.delay(0.3, function() if f and f.Parent then f:Destroy() end end)
+            TweenService:Create(
+                f,
+                TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+                {TextTransparency = 1}
+            ):Play()
+
+            task.delay(0.3, function()
+                if f and f.Parent then
+                    f:Destroy()
+                end
+            end)
         end
     end
+
     pFlakes = {}
+
     local containerToDestroy = pContainer
     if containerToDestroy and containerToDestroy.Parent then
         task.delay(0.3, function()
-            if containerToDestroy and containerToDestroy.Parent then containerToDestroy:Destroy() end
+            if containerToDestroy and containerToDestroy.Parent then
+                containerToDestroy:Destroy()
+            end
         end)
     end
     pContainer = nil
@@ -365,7 +255,11 @@ local function makeParticleContainer()
     c.BackgroundTransparency = 1
     c.ZIndex = 2
     c.ClipsDescendants = true
-    local cc = Instance.new("UICorner"); cc.CornerRadius = UDim.new(0, 24); cc.Parent = c
+
+    local cc = Instance.new("UICorner")
+    cc.CornerRadius = UDim.new(0, 24)
+    cc.Parent = c
+
     return c
 end
 
@@ -381,7 +275,15 @@ local function startSnow()
         local x=math.random(2,95)/100; f.Size=UDim2.new(0,30,0,30)
         f.Position = UDim2.new(x, 0, -0.02, 0)
         local dur=math.random(7,12); local drift=math.random(-5,5)/100
-        tw(f, TweenInfo.new(dur, Enum.EasingStyle.Sine), {Position = UDim2.new(x+drift, 0, 1.02, 0), TextTransparency=0.8})
+        local endY = minimized and 1 or 1.02
+
+        tw(f,
+            TweenInfo.new(dur, Enum.EasingStyle.Sine),
+            {
+                Position = UDim2.new(x + drift, 0, endY, 0),
+                TextTransparency = 0.8
+            }
+        )
         table.insert(pFlakes,f)
         task.delay(dur,function() active=active-1; if f and f.Parent then f:Destroy() end end)
     end
@@ -401,7 +303,15 @@ local function startValentine()
         local x=math.random(2,95)/100; f.Size=UDim2.new(0,30,0,30)
         f.Position = UDim2.new(x, 0, -0.02, 0)
         local dur=math.random(7,12); local drift=math.random(-5,5)/100
-        tw(f, TweenInfo.new(dur, Enum.EasingStyle.Sine), {Position = UDim2.new(x+drift, 0, 1.02, 0), TextTransparency=0.8})
+        local endY = minimized and 1 or 1.02
+
+        tw(f,
+            TweenInfo.new(dur, Enum.EasingStyle.Sine),
+            {
+                Position = UDim2.new(x + drift, 0, endY, 0),
+                TextTransparency = 0.8
+            }
+        )
         table.insert(pFlakes,f)
         task.delay(dur,function() active=active-1; if f and f.Parent then f:Destroy() end end)
     end
@@ -418,8 +328,10 @@ local function applyTheme(name)
 
     tw(root,T_SMOOTH,{BackgroundColor3=t.primary})
     rootStroke.Color=t.stroke
+
     tw(header,T_SMOOTH,{BackgroundColor3=t.secondary})
     tw(headerDivider,T_SMOOTH,{BackgroundColor3=t.stroke})
+
     tw(sidebar,T_SMOOTH,{BackgroundColor3=t.sidebar})
     tw(sidebarTopCover,T_SMOOTH,{BackgroundColor3=t.sidebar})
     tw(sideDiv,T_SMOOTH,{BackgroundColor3=t.stroke})
@@ -434,6 +346,7 @@ local function applyTheme(name)
     tw(titleLabel,T_SMOOTH,{TextColor3=t.text})
     tw(subtitleLabel,T_SMOOTH,{TextColor3=t.subtext})
     tw(statusLabel,T_SMOOTH,{TextColor3=t.subtext})
+
     tw(minimize,T_SMOOTH,{BackgroundColor3=t.row,TextColor3=t.text})
     minimizeStroke.Color=t.stroke
     tw(close,T_SMOOTH,{BackgroundColor3=t.row,TextColor3=t.text})
@@ -483,40 +396,53 @@ local function applyTheme(name)
             if s.stroke then s.stroke.Color=t.stroke end
             tw(s.fill,  T_SMOOTH, {BackgroundColor3=t.accent})
             tw(s.knob,  T_SMOOTH, {BackgroundColor3=t.accent})
-            if s.valLbl  then tw(s.valLbl,  T_SMOOTH, {TextColor3=t.accent}) end
+            if s.valLbl then tw(s.valLbl, T_SMOOTH, {TextColor3=t.accent}) end
             if s.nameLbl then tw(s.nameLbl, T_SMOOTH, {TextColor3=t.text}) end
         end
     end
 
-    if bgSection       then tw(bgSection,T_SMOOTH,{BackgroundColor3=t.row}) end
+    if bgSection      then tw(bgSection,T_SMOOTH,{BackgroundColor3=t.row}) end
     if bgSectionStroke then bgSectionStroke.Color=t.stroke end
-    if bgPrefixLbl     then tw(bgPrefixLbl,T_SMOOTH,{TextColor3=t.subtext}) end
-    if bgInput         then
+    if bgPrefixLbl    then tw(bgPrefixLbl,T_SMOOTH,{TextColor3=t.subtext}) end
+    if bgInput        then
         tw(bgInput,T_SMOOTH,{BackgroundColor3=t.primary,TextColor3=t.text})
         bgInput.PlaceholderColor3=t.subtext
     end
-    if applyBgBtn then tw(applyBgBtn,T_SMOOTH,{BackgroundColor3=t.accent,TextColor3=t.primary}) end
+    if applyBgBtn     then tw(applyBgBtn,T_SMOOTH,{BackgroundColor3=t.accent,TextColor3=t.primary}) end
 
     for i, tb in ipairs(tabBtns) do
         local on = (i == activeTabIdx)
-        tw(tb.bg, T_SMOOTH, {BackgroundColor3 = on and t.accent or t.row, BackgroundTransparency = on and 0 or 0.55})
+        tw(tb.bg, T_SMOOTH, {
+            BackgroundColor3 = on and t.accent or t.row,
+            BackgroundTransparency = on and 0 or 0.55
+        })
         tw(tb.lbl, T_SMOOTH, {TextColor3 = on and t.primary or t.text})
         if tb.isImage then
             tw(tb.ico, T_SMOOTH, {ImageColor3 = on and t.primary or t.subtext})
-            if tabData[i].name == "Main"      and t.mainTabIcon      then tb.ico.Image = "rbxassetid://" .. t.mainTabIcon end
-            if tabData[i].name == "Mics"      and t.micsTabIcon      then tb.ico.Image = "rbxassetid://" .. t.micsTabIcon end
-            if tabData[i].name == "Teleports" and t.teleportTabIcon  then tb.ico.Image = "rbxassetid://" .. t.teleportTabIcon end
-            if tabData[i].name == "Settings"  and t.settingsTabIcon  then tb.ico.Image = "rbxassetid://" .. t.settingsTabIcon end
+            if tabData[i].name == "Main" and t.mainTabIcon then
+                tb.ico.Image = "rbxassetid://" .. t.mainTabIcon
+            elseif tabData[i].name == "Mics" and t.micsTabIcon then
+                tb.ico.Image = "rbxassetid://" .. t.micsTabIcon
+            elseif tabData[i].name == "Teleports" and t.teleportTabIcon then
+                tb.ico.Image = "rbxassetid://" .. t.teleportTabIcon
+            elseif tabData[i].name == "Settings" and t.settingsTabIcon then
+                tb.ico.Image = "rbxassetid://" .. t.settingsTabIcon
+            end
         else
             tw(tb.ico, T_SMOOTH, {TextColor3 = on and t.primary or t.subtext})
         end
     end
 
     clearParticles()
+
     if not minimized then
         task.delay(0.35, function()
-            local t2 = themes[config.theme]
-            if t2.snow then startSnow() elseif t2.valentine then startValentine() end
+            local t = themes[config.theme]
+            if t.snow then
+                startSnow()
+            elseif t.valentine then
+                startValentine()
+            end
         end)
     end
 end
@@ -531,10 +457,8 @@ end
 -- BUILD ROOT
 --====================================================
 root=Instance.new("Frame"); root.Parent=gui
-root.Size=UDim2.new(0, UI_W, 0, UI_H)
-root.Position=UDim2.fromScale(0.5,0.5)
-root.AnchorPoint=Vector2.new(0.5,0.5)
-root.BackgroundColor3=themes[config.theme].primary
+root.Size=UDim2.new(0,500,0,390); root.Position=UDim2.fromScale(0.5,0.5)
+root.AnchorPoint=Vector2.new(0.5,0.5); root.BackgroundColor3=themes[config.theme].primary
 root.BackgroundTransparency=0.02; root.ClipsDescendants=true; root.ZIndex=1
 local rc=Instance.new("UICorner",root); rc.CornerRadius=UDim.new(0,24)
 rootStroke=Instance.new("UIStroke",root); rootStroke.Color=themes[config.theme].stroke
@@ -550,9 +474,10 @@ bgImage.ScaleType = Enum.ScaleType.Crop
 bgImage.ImageTransparency = 0.82
 bgImage.ZIndex = 1
 bgImage.ClipsDescendants = true
-local bic = Instance.new("UICorner"); bic.CornerRadius = UDim.new(0, 24); bic.Parent = bgImage
 
-setupDrag()
+local bic = Instance.new("UICorner")
+bic.CornerRadius = UDim.new(0, 24)
+bic.Parent = bgImage
 
 --====================================================
 -- HEADER
@@ -560,10 +485,15 @@ setupDrag()
 header = Instance.new("Frame")
 header.Parent = root
 header.Size = UDim2.new(1, 0, 0, 58)
+header.Position = UDim2.new(0, 0, 0, 0)
 header.BackgroundColor3 = themes[config.theme].secondary
 header.BackgroundTransparency = 0.25
-header.BorderSizePixel = 0; header.ZIndex = 3
-local hc = Instance.new("UICorner"); hc.CornerRadius = UDim.new(0, 24); hc.Parent = header
+header.BorderSizePixel = 0
+header.ZIndex = 3
+
+local hc = Instance.new("UICorner")
+hc.CornerRadius = UDim.new(0, 24)
+hc.Parent = header
 header.ClipsDescendants = true
 
 headerDivider=Instance.new("Frame"); headerDivider.Parent=root
@@ -579,10 +509,10 @@ local lgc=Instance.new("UICorner",logo); lgc.CornerRadius=UDim.new(0.3,0)
 
 titleLabel=Instance.new("TextLabel"); titleLabel.Parent=root
 titleLabel.Size=UDim2.new(0,200,0,20); titleLabel.Position=UDim2.new(0,58,0,12)
-titleLabel.BackgroundTransparency=1; titleLabel.Text="WH01"
-titleLabel.Font=fonts[config.fontStyle] or Enum.Font.GothamBold
-titleLabel.TextSize=11; titleLabel.TextColor3=themes[config.theme].text
-titleLabel.TextXAlignment=Enum.TextXAlignment.Left; titleLabel.ZIndex=5
+titleLabel.BackgroundTransparency=1
+titleLabel.Text="WH01"
+titleLabel.Font=fonts[config.fontStyle] or Enum.Font.GothamBold; titleLabel.TextSize=11
+titleLabel.TextColor3=themes[config.theme].text; titleLabel.TextXAlignment=Enum.TextXAlignment.Left; titleLabel.ZIndex=5
 table.insert(fontObjs,titleLabel)
 
 task.spawn(function()
@@ -630,8 +560,8 @@ closeStroke=Instance.new("UIStroke",close); closeStroke.Color=themes[config.them
 
 minimize.MouseEnter:Connect(function() tw(minimize,T_FAST,{BackgroundColor3=themes[config.theme].accent,TextColor3=themes[config.theme].primary}) end)
 minimize.MouseLeave:Connect(function() tw(minimize,T_FAST,{BackgroundColor3=themes[config.theme].row,TextColor3=themes[config.theme].text}) end)
-close.MouseEnter:Connect(function()   tw(close,T_FAST,{BackgroundColor3=themes[config.theme].accent,TextColor3=themes[config.theme].primary}) end)
-close.MouseLeave:Connect(function()   tw(close,T_FAST,{BackgroundColor3=themes[config.theme].row,TextColor3=themes[config.theme].text}) end)
+close.MouseEnter:Connect(function() tw(close,T_FAST,{BackgroundColor3=themes[config.theme].accent,TextColor3=themes[config.theme].primary}) end)
+close.MouseLeave:Connect(function() tw(close,T_FAST,{BackgroundColor3=themes[config.theme].row,TextColor3=themes[config.theme].text}) end)
 
 close.MouseButton1Click:Connect(function()
     clearParticles()
@@ -639,10 +569,10 @@ close.MouseButton1Click:Connect(function()
     task.delay(0.35,function() gui:Destroy() end)
 end)
 
--- Minimizar también funciona con Activated (mouse + touch)
 local minimized=false
-local function doMinimize()
+minimize.MouseButton1Click:Connect(function()
     minimized = not minimized
+
     if minimized then
         clearParticles()
         task.delay(0.02, function()
@@ -650,11 +580,11 @@ local function doMinimize()
             statusLabel.Visible = false
             bgImage.Visible = false
         end)
-        tw(root, T_SMOOTH, {Size = UDim2.new(0, isMobile and 220 or 280, 0, 58)})
+        tw(root, T_SMOOTH, {Size = UDim2.new(0, 280, 0, 58)})
         minimize.Text = "▢"
         if gameName then titleLabel.Text = gameName end
     else
-        tw(root, T_SMOOTH, {Size = UDim2.new(0, UI_W, 0, UI_H)})
+        tw(root, T_SMOOTH, {Size = UDim2.new(0, 500, 0, 390)})
         if gameName then titleLabel.Text = "WH01  ·  " .. gameName end
         task.delay(0.35, function()
             if body then body.Visible = true end
@@ -662,21 +592,12 @@ local function doMinimize()
             bgImage.Visible = true
             minimize.Text = "—"
             local t = themes[config.theme]
-            if t.snow then startSnow() elseif t.valentine then startValentine() end
+            if t.snow then
+                startSnow()
+            elseif t.valentine then
+                startValentine()
+            end
         end)
-    end
-end
-
-minimize.MouseButton1Click:Connect(doMinimize)
--- Touch support para minimize
-minimize.Activated:Connect(function()
-    if isMobile then doMinimize() end
-end)
-close.Activated:Connect(function()
-    if isMobile then
-        clearParticles()
-        tw(root,TweenInfo.new(0.3,Enum.EasingStyle.Back,Enum.EasingDirection.In),{Size=UDim2.new(0,0,0,0)})
-        task.delay(0.35,function() gui:Destroy() end)
     end
 end)
 
@@ -691,28 +612,25 @@ body.BackgroundTransparency=1; body.ZIndex=2
 -- SIDEBAR
 --====================================================
 sidebar=Instance.new("Frame"); sidebar.Parent=body
-sidebar.Size=UDim2.new(0, SIDEBAR_W, 1, 0)
-sidebar.BackgroundColor3=themes[config.theme].sidebar
+sidebar.Size=UDim2.new(0,118,1,0); sidebar.BackgroundColor3=themes[config.theme].sidebar
 sidebar.BackgroundTransparency=0.15; sidebar.BorderSizePixel=0; sidebar.ZIndex=3
 local sdc=Instance.new("UICorner",sidebar); sdc.CornerRadius=UDim.new(0,20)
 
 sidebarTopCover=Instance.new("Frame"); sidebarTopCover.Parent=sidebar
-sidebarTopCover.Size=UDim2.new(1,0,0,22)
+sidebarTopCover.Size=UDim2.new(1,0,0,22); sidebarTopCover.Position=UDim2.new(0,0,0,0)
 sidebarTopCover.BackgroundColor3=themes[config.theme].sidebar
 sidebarTopCover.BackgroundTransparency=0.15; sidebarTopCover.BorderSizePixel=0; sidebarTopCover.ZIndex=3
 
 sideDiv=Instance.new("Frame"); sideDiv.Parent=body
-sideDiv.Size=UDim2.new(0,1,1,0); sideDiv.Position=UDim2.new(0, SIDEBAR_W, 0, 0)
+sideDiv.Size=UDim2.new(0,1,1,0); sideDiv.Position=UDim2.new(0,118,0,0)
 sideDiv.BackgroundColor3=themes[config.theme].stroke
 sideDiv.BackgroundTransparency=0.9; sideDiv.BorderSizePixel=0; sideDiv.ZIndex=4
 
 --====================================================
 -- CONTENT AREA
 --====================================================
-local CONTENT_LEFT = SIDEBAR_W + 8
 contentArea=Instance.new("ScrollingFrame"); contentArea.Parent=body
-contentArea.Size=UDim2.new(1, -CONTENT_LEFT - 4, 1, -16)
-contentArea.Position=UDim2.new(0, CONTENT_LEFT, 0, 8)
+contentArea.Size=UDim2.new(1,-130,1,-16); contentArea.Position=UDim2.new(0,126,0,8)
 contentArea.BackgroundTransparency=1; contentArea.ZIndex=3
 contentArea.ScrollBarThickness=3; contentArea.ScrollBarImageColor3=themes[config.theme].accent
 contentArea.ScrollBarImageTransparency=0.3
@@ -721,10 +639,6 @@ contentArea.ClipsDescendants=true; contentArea.BorderSizePixel=0
 contentArea.TopImage="rbxasset://textures/ui/Scroll/scroll-middle.png"
 contentArea.MidImage="rbxasset://textures/ui/Scroll/scroll-middle.png"
 contentArea.BottomImage="rbxasset://textures/ui/Scroll/scroll-middle.png"
--- En móvil, deshabilitar scrolling si un slider está activo
-if isMobile then
-    contentArea.ScrollingEnabled = true
-end
 
 --====================================================
 -- PAGES
@@ -732,26 +646,18 @@ end
 local mainPage=Instance.new("Frame"); mainPage.Parent=contentArea
 mainPage.Size=UDim2.fromScale(1,0); mainPage.AutomaticSize=Enum.AutomaticSize.Y
 mainPage.BackgroundTransparency=1; mainPage.Visible=true; mainPage.ZIndex=4
-local mainPagePad=Instance.new("UIPadding",mainPage)
-mainPagePad.PaddingLeft=UDim.new(0,8); mainPagePad.PaddingRight=UDim.new(0,8)
+local mainPagePad=Instance.new("UIPadding",mainPage); mainPagePad.PaddingLeft=UDim.new(0,8); mainPagePad.PaddingRight=UDim.new(0,8)
 
-local micsPage=Instance.new("Frame"); micsPage.Parent=contentArea
+-- LOCAL PLAYER PAGE
+local micsPage=Instance.new("Frame"); micsPage.Parent= contentArea
 micsPage.Size=UDim2.fromScale(1,0); micsPage.AutomaticSize=Enum.AutomaticSize.Y
 micsPage.BackgroundTransparency=1; micsPage.Visible=false; micsPage.ZIndex=4
-local micsPagePad=Instance.new("UIPadding",micsPage)
-micsPagePad.PaddingLeft=UDim.new(0,8); micsPagePad.PaddingRight=UDim.new(0,8)
+local micsPagePad=Instance.new("UIPadding",micsPage); micsPagePad.PaddingLeft=UDim.new(0,8); micsPagePad.PaddingRight=UDim.new(0,8)
 
 local settingsPage=Instance.new("Frame"); settingsPage.Parent=contentArea
 settingsPage.Size=UDim2.fromScale(1,0); settingsPage.AutomaticSize=Enum.AutomaticSize.Y
 settingsPage.BackgroundTransparency=1; settingsPage.Visible=false; settingsPage.ZIndex=4
-local settingsPagePad=Instance.new("UIPadding",settingsPage)
-settingsPagePad.PaddingLeft=UDim.new(0,8); settingsPagePad.PaddingRight=UDim.new(0,8)
-
-local teleportsPage=Instance.new("Frame"); teleportsPage.Parent=contentArea
-teleportsPage.Size=UDim2.fromScale(1,0); teleportsPage.AutomaticSize=Enum.AutomaticSize.Y
-teleportsPage.BackgroundTransparency=1; teleportsPage.Visible=false; teleportsPage.ZIndex=4
-local teleportsPagePad=Instance.new("UIPadding",teleportsPage)
-teleportsPagePad.PaddingLeft=UDim.new(0,8); teleportsPagePad.PaddingRight=UDim.new(0,8)
+local settingsPagePad=Instance.new("UIPadding",settingsPage); settingsPagePad.PaddingLeft=UDim.new(0,8); settingsPagePad.PaddingRight=UDim.new(0,8)
 
 local function updateCanvasSize(page)
     local maxY = 0
@@ -764,10 +670,24 @@ local function updateCanvasSize(page)
     contentArea.CanvasSize = UDim2.new(0, 0, 0, maxY + 20)
 end
 
-mainPage:GetPropertyChangedSignal("Visible"):Connect(function() if mainPage.Visible then updateCanvasSize(mainPage) end end)
-micsPage:GetPropertyChangedSignal("Visible"):Connect(function() if micsPage.Visible then updateCanvasSize(micsPage) end end)
-settingsPage:GetPropertyChangedSignal("Visible"):Connect(function() if settingsPage.Visible then updateCanvasSize(settingsPage) end end)
-teleportsPage:GetPropertyChangedSignal("Visible"):Connect(function() if teleportsPage.Visible then updateCanvasSize(teleportsPage) end end)
+mainPage:GetPropertyChangedSignal("Visible"):Connect(function()
+    if mainPage.Visible then updateCanvasSize(mainPage) end
+end)
+micsPage:GetPropertyChangedSignal("Visible"):Connect(function()
+    if micsPage.Visible then updateCanvasSize(micsPage) end
+end)
+settingsPage:GetPropertyChangedSignal("Visible"):Connect(function()
+    if settingsPage.Visible then updateCanvasSize(settingsPage) end
+end)
+
+local teleportsPage=Instance.new("Frame"); teleportsPage.Parent= contentArea
+teleportsPage.Size=UDim2.fromScale(1,0); teleportsPage.AutomaticSize=Enum.AutomaticSize.Y
+teleportsPage.BackgroundTransparency=1; teleportsPage.Visible=false; teleportsPage.ZIndex=4
+local teleportsPagePad=Instance.new("UIPadding",teleportsPage); teleportsPagePad.PaddingLeft=UDim.new(0,8); teleportsPagePad.PaddingRight=UDim.new(0,8)
+
+teleportsPage:GetPropertyChangedSignal("Visible"):Connect(function()
+    if teleportsPage.Visible then updateCanvasSize(teleportsPage) end
+end)
 
 --====================================================
 -- WIDGET HELPERS
@@ -776,7 +696,7 @@ local function secLabel(parent,text,yp)
     local l=Instance.new("TextLabel"); l.Parent=parent
     l.Size=UDim2.new(1,0,0,18); l.Position=UDim2.new(0,2,0,yp)
     l.BackgroundTransparency=1; l.Text=text; l.Font=Enum.Font.GothamBold
-    l.TextSize=FONT_SUB; l.TextColor3=themes[config.theme].subtext
+    l.TextSize=10; l.TextColor3=themes[config.theme].subtext
     l.TextXAlignment=Enum.TextXAlignment.Left; l.ZIndex=5
     table.insert(textSub,l); table.insert(fontObjs,l); return l
 end
@@ -784,7 +704,7 @@ end
 local function checkbox(parent,text,yp,defaultOn)
     local t=themes[config.theme]; local state=defaultOn or false
     local row=Instance.new("Frame"); row.Parent=parent
-    row.Size=UDim2.new(1,0,0,ROW_H); row.Position=UDim2.new(0,0,0,yp)
+    row.Size=UDim2.new(1,0,0,38); row.Position=UDim2.new(0,0,0,yp)
     row.BackgroundColor3=t.row; row.BackgroundTransparency=0.2
     row.BorderSizePixel=0; row.ZIndex=5
     local rc2=Instance.new("UICorner",row); rc2.CornerRadius=UDim.new(0,14)
@@ -794,7 +714,7 @@ local function checkbox(parent,text,yp,defaultOn)
     local lbl=Instance.new("TextLabel"); lbl.Parent=row
     lbl.Size=UDim2.new(1,-55,1,0); lbl.Position=UDim2.new(0,14,0,0)
     lbl.BackgroundTransparency=1; lbl.Text=text
-    lbl.Font=fonts[config.fontStyle] or Enum.Font.GothamBold; lbl.TextSize=FONT_MAIN
+    lbl.Font=fonts[config.fontStyle] or Enum.Font.GothamBold; lbl.TextSize=12
     lbl.TextColor3=t.text; lbl.TextXAlignment=Enum.TextXAlignment.Left; lbl.ZIndex=6
     table.insert(textMain,lbl); table.insert(fontObjs,lbl)
 
@@ -821,36 +741,30 @@ local function checkbox(parent,text,yp,defaultOn)
         tw(row,T_FAST,{BackgroundColor3=themes[config.theme].row, BackgroundTransparency=0.2})
         tw(lbl,T_FAST,{TextColor3=themes[config.theme].text})
     end)
-    local function toggleCheckbox()
+    btn.MouseButton1Click:Connect(function()
         if overridden then overridden=false; return end
         state=not state; chk.Visible=state
         tw(box,T_FAST,{BackgroundColor3=state and themes[config.theme].accent or themes[config.theme].row})
         statusLabel.Text="● "..text..": "..(state and "ON" or "OFF")
-    end
-    btn.MouseButton1Click:Connect(toggleCheckbox)
-    if isMobile then
-        btn.TouchTap:Connect(toggleCheckbox)
-    else
-        btn.Activated:Connect(function() toggleCheckbox() end)
-    end
-
+    end)
     local function forceOff()
         if state then overridden = true end
-        state = false; chk.Visible = false
+        state = false
+        chk.Visible = false
         tw(box, T_FAST, {BackgroundColor3 = themes[config.theme].row})
     end
     return btn, function() return state end, forceOff
 end
 
 --====================================================
--- SLIDER WIDGET — con soporte Touch
+-- SLIDER WIDGET
 --====================================================
 local function slider(parent, labelText, yp, minVal, maxVal, defaultVal, onChange)
     local t = themes[config.theme]
     local currentVal = defaultVal or minVal
 
     local row = Instance.new("Frame"); row.Parent = parent
-    row.Size = UDim2.new(1, 0, 0, SLIDER_H); row.Position = UDim2.new(0, 0, 0, yp)
+    row.Size = UDim2.new(1, 0, 0, 54); row.Position = UDim2.new(0, 0, 0, yp)
     row.BackgroundColor3 = t.row; row.BackgroundTransparency = 0.2
     row.BorderSizePixel = 0; row.ZIndex = 5
     local rowc = Instance.new("UICorner", row); rowc.CornerRadius = UDim.new(0, 14)
@@ -860,7 +774,7 @@ local function slider(parent, labelText, yp, minVal, maxVal, defaultVal, onChang
     local nameLbl = Instance.new("TextLabel"); nameLbl.Parent = row
     nameLbl.Size = UDim2.new(1, -70, 0, 18); nameLbl.Position = UDim2.new(0, 14, 0, 7)
     nameLbl.BackgroundTransparency = 1; nameLbl.Text = labelText
-    nameLbl.Font = fonts[config.fontStyle] or Enum.Font.GothamBold; nameLbl.TextSize = FONT_MAIN
+    nameLbl.Font = fonts[config.fontStyle] or Enum.Font.GothamBold; nameLbl.TextSize = 12
     nameLbl.TextColor3 = t.text; nameLbl.TextXAlignment = Enum.TextXAlignment.Left; nameLbl.ZIndex = 6
     table.insert(textMain, nameLbl); table.insert(fontObjs, nameLbl)
 
@@ -868,13 +782,12 @@ local function slider(parent, labelText, yp, minVal, maxVal, defaultVal, onChang
     valLbl.Size = UDim2.new(0, 52, 0, 18); valLbl.Position = UDim2.new(1, -62, 0, 7)
     valLbl.BackgroundTransparency = 1
     valLbl.Text = tostring(math.floor(currentVal))
-    valLbl.Font = Enum.Font.GothamBold; valLbl.TextSize = FONT_MAIN
+    valLbl.Font = Enum.Font.GothamBold; valLbl.TextSize = 12
     valLbl.TextColor3 = t.accent; valLbl.TextXAlignment = Enum.TextXAlignment.Right; valLbl.ZIndex = 6
     table.insert(textMain, valLbl)
 
-    local TRACK_Y = isMobile and 30 or 36
     local track = Instance.new("Frame"); track.Parent = row
-    track.Size = UDim2.new(1, -28, 0, 6); track.Position = UDim2.new(0, 14, 0, TRACK_Y)
+    track.Size = UDim2.new(1, -28, 0, 6); track.Position = UDim2.new(0, 14, 0, 36)
     track.BackgroundColor3 = t.row; track.BackgroundTransparency = 0; track.BorderSizePixel = 0; track.ZIndex = 6
     local trackc = Instance.new("UICorner", track); trackc.CornerRadius = UDim.new(1, 0)
     local trackStroke = Instance.new("UIStroke", track); trackStroke.Color = t.stroke; trackStroke.Transparency = 0.85
@@ -882,13 +795,12 @@ local function slider(parent, labelText, yp, minVal, maxVal, defaultVal, onChang
 
     local ratio = (currentVal - minVal) / (maxVal - minVal)
     local fill = Instance.new("Frame"); fill.Parent = track
-    fill.Size = UDim2.new(ratio, 0, 1, 0); fill.BackgroundColor3 = t.accent
-    fill.BorderSizePixel = 0; fill.ZIndex = 7
+    fill.Size = UDim2.new(ratio, 0, 1, 0); fill.Position = UDim2.new(0, 0, 0, 0)
+    fill.BackgroundColor3 = t.accent; fill.BorderSizePixel = 0; fill.ZIndex = 7
     local fillc = Instance.new("UICorner", fill); fillc.CornerRadius = UDim.new(1, 0)
 
-    local KNOB_SIZE = isMobile and 20 or 16
     local knob = Instance.new("Frame"); knob.Parent = track
-    knob.Size = UDim2.new(0, KNOB_SIZE, 0, KNOB_SIZE); knob.AnchorPoint = Vector2.new(0.5, 0.5)
+    knob.Size = UDim2.new(0, 16, 0, 16); knob.AnchorPoint = Vector2.new(0.5, 0.5)
     knob.Position = UDim2.new(ratio, 0, 0.5, 0)
     knob.BackgroundColor3 = t.accent; knob.BorderSizePixel = 0; knob.ZIndex = 8
     local knobC = Instance.new("UICorner", knob); knobC.CornerRadius = UDim.new(1, 0)
@@ -915,63 +827,41 @@ local function slider(parent, labelText, yp, minVal, maxVal, defaultVal, onChang
         if onChange then onChange(newVal) end
     end
 
-    -- Zona clickeable / tactil más grande (mejor para dedos)
-    local TOUCH_PAD = isMobile and 32 or 28
     local trackBtn = Instance.new("TextButton"); trackBtn.Parent = track
-    trackBtn.Size = UDim2.new(1, 0, 0, TOUCH_PAD); trackBtn.Position = UDim2.new(0, 0, 0.5, -TOUCH_PAD/2)
+    trackBtn.Size = UDim2.new(1, 0, 0, 28); trackBtn.Position = UDim2.new(0, 0, 0.5, -14)
     trackBtn.BackgroundTransparency = 1; trackBtn.Text = ""; trackBtn.ZIndex = 10
 
-    -- Mouse
     trackBtn.InputBegan:Connect(function(inp)
         if inp.UserInputType == Enum.UserInputType.MouseButton1 then
-            activeSlider = {track=track, minVal=minVal, maxVal=maxVal, label=labelText, update=updateSlider}
+            activeSlider = {
+                track = track, minVal = minVal, maxVal = maxVal,
+                label = labelText, update = updateSlider
+            }
             local r = math.clamp((inp.Position.X - track.AbsolutePosition.X) / track.AbsoluteSize.X, 0, 1)
             updateSlider(minVal + r * (maxVal - minVal), true)
             statusLabel.Text = "● " .. labelText .. ": " .. tostring(math.floor(currentVal))
-        end
-    end)
-
-    -- Touch: activar slider y bloquear drag/scroll
-    trackBtn.InputBegan:Connect(function(inp)
-        if inp.UserInputType == Enum.UserInputType.Touch then
-            -- Cancelar cualquier drag activo
-            dragging    = false
-            touchDragId = nil
-            -- Activar slider
-            activeSlider = {track=track, minVal=minVal, maxVal=maxVal, label=labelText, update=updateSlider}
-            if isMobile then contentArea.ScrollingEnabled = false end
-            local r = math.clamp((inp.Position.X - track.AbsolutePosition.X) / track.AbsoluteSize.X, 0, 1)
-            updateSlider(minVal + r * (maxVal - minVal), true)
-            statusLabel.Text = "● " .. labelText .. ": " .. tostring(math.floor(currentVal))
-        end
-    end)
-
-    -- Al soltar touch sobre el slider
-    trackBtn.InputEnded:Connect(function(inp)
-        if inp.UserInputType == Enum.UserInputType.Touch then
-            activeSlider = nil
-            if isMobile then contentArea.ScrollingEnabled = true end
         end
     end)
 
     knob.InputBegan:Connect(function(inp)
-        if inp.UserInputType == Enum.UserInputType.MouseButton1 or inp.UserInputType == Enum.UserInputType.Touch then
-            dragging = false; touchDragId = nil
-            activeSlider = {track=track, minVal=minVal, maxVal=maxVal, label=labelText, update=updateSlider}
-            if isMobile then contentArea.ScrollingEnabled = false end
+        if inp.UserInputType == Enum.UserInputType.MouseButton1 then
+            activeSlider = {
+                track = track, minVal = minVal, maxVal = maxVal,
+                label = labelText, update = updateSlider
+            }
         end
     end)
 
     trackBtn.MouseEnter:Connect(function()
-        tw(knob, T_FAST, {Size = UDim2.new(0, KNOB_SIZE+2, 0, KNOB_SIZE+2)})
-        tw(row, T_FAST, {BackgroundColor3=themes[config.theme].accent, BackgroundTransparency=0.4})
+        tw(knob, T_FAST, {Size = UDim2.new(0, 18, 0, 18)})
+        tw(row, T_FAST, {BackgroundColor3=themes[config.theme].accent, BackgroundTransparency = 0.4})
         tw(nameLbl, T_FAST, {TextColor3=themes[config.theme].primary})
         tw(valLbl, T_FAST, {TextColor3=themes[config.theme].primary})
     end)
     trackBtn.MouseLeave:Connect(function()
         if not activeSlider then
-            tw(knob, T_FAST, {Size = UDim2.new(0, KNOB_SIZE, 0, KNOB_SIZE)})
-            tw(row, T_FAST, {BackgroundColor3=themes[config.theme].row, BackgroundTransparency=0.2})
+            tw(knob, T_FAST, {Size = UDim2.new(0, 16, 0, 16)})
+            tw(row, T_FAST, {BackgroundColor3=themes[config.theme].row, BackgroundTransparency = 0.2})
             tw(nameLbl, T_FAST, {TextColor3=themes[config.theme].text})
             tw(valLbl, T_FAST, {TextColor3=themes[config.theme].accent})
         end
@@ -983,7 +873,7 @@ end
 local function actionButton(parent,text,yp)
     local t=themes[config.theme]
     local btn=Instance.new("TextButton"); btn.Parent=parent
-    btn.Size=UDim2.new(1,0,0,ROW_H); btn.Position=UDim2.new(0,0,0,yp)
+    btn.Size=UDim2.new(1,0,0,38); btn.Position=UDim2.new(0,0,0,yp)
     btn.Text=""; btn.BackgroundColor3=t.row; btn.BackgroundTransparency=0.2
     btn.AutoButtonColor=false; btn.ZIndex=5
     local bc2=Instance.new("UICorner",btn); bc2.CornerRadius=UDim.new(0,14)
@@ -993,7 +883,7 @@ local function actionButton(parent,text,yp)
     local lbl=Instance.new("TextLabel"); lbl.Parent=btn
     lbl.Size=UDim2.new(1,-30,1,0); lbl.Position=UDim2.new(0,14,0,0)
     lbl.BackgroundTransparency=1; lbl.Text=text
-    lbl.Font=fonts[config.fontStyle] or Enum.Font.GothamBold; lbl.TextSize=FONT_MAIN
+    lbl.Font=fonts[config.fontStyle] or Enum.Font.GothamBold; lbl.TextSize=12
     lbl.TextColor3=t.text; lbl.TextXAlignment=Enum.TextXAlignment.Left; lbl.ZIndex=6
     table.insert(textMain,lbl); table.insert(fontObjs,lbl)
 
@@ -1013,10 +903,8 @@ local function actionButton(parent,text,yp)
         tw(lbl,T_FAST,{TextColor3=themes[config.theme].text})
         tw(arr,T_FAST,{TextColor3=themes[config.theme].subtext,Position=UDim2.new(1,-28,0.5,-10)})
     end)
-    btn.MouseButton1Down:Connect(function() tw(btn,TweenInfo.new(0.1),{Size=UDim2.new(1,-4,0,ROW_H-2)}) end)
-    btn.MouseButton1Up:Connect(function()   tw(btn,TweenInfo.new(0.1),{Size=UDim2.new(1,0,0,ROW_H)}) end)
-    -- Touch feedback
-    btn.TouchLongPress:Connect(function() tw(btn,TweenInfo.new(0.1),{Size=UDim2.new(1,-4,0,ROW_H-2)}) end)
+    btn.MouseButton1Down:Connect(function() tw(btn,TweenInfo.new(0.1),{Size=UDim2.new(1,-4,0,36)}) end)
+    btn.MouseButton1Up:Connect(function()   tw(btn,TweenInfo.new(0.1),{Size=UDim2.new(1,0,0,38)}) end)
     return btn
 end
 
@@ -1073,23 +961,19 @@ local function dropdown(parent,labelText,options,currentVal,yp,onChange)
         table.insert(fontObjs,ob)
         ob.MouseEnter:Connect(function() tw(ob,T_FAST,{BackgroundTransparency=0.3}) end)
         ob.MouseLeave:Connect(function() tw(ob,T_FAST,{BackgroundTransparency=(ob.Text==vl.Text) and 0.4 or 0.85}) end)
-        local function selectOpt()
+        ob.MouseButton1Click:Connect(function()
             vl.Text=opt; dl.Visible=false; activeDD=nil; tw(al,T_FAST,{Rotation=0})
             onChange(opt); statusLabel.Text="● "..labelText..": "..opt
-        end
-        ob.MouseButton1Click:Connect(selectOpt)
-        ob.Activated:Connect(function() if isMobile then selectOpt() end end)
+        end)
     end
 
     local tb=Instance.new("TextButton"); tb.Parent=mr
     tb.Size=UDim2.fromScale(1,1); tb.BackgroundTransparency=1; tb.Text=""; tb.ZIndex=10
-    local function toggleDD()
+    tb.MouseButton1Click:Connect(function()
         if activeDD and activeDD~=dl then activeDD.Visible=false; activeDD=nil end
         dl.Visible=not dl.Visible; activeDD=dl.Visible and dl or nil
         tw(al,T_FAST,{Rotation=dl.Visible and 180 or 0})
-    end
-    tb.MouseButton1Click:Connect(toggleDD)
-    tb.Activated:Connect(function() if isMobile then toggleDD() end end)
+    end)
     return cont
 end
 
@@ -1105,13 +989,19 @@ local popupBlockerConn = nil
 local function startPopupBlocker()
     popupBlockerConn = RunService.Heartbeat:Connect(function()
         for _, gui in ipairs(PlayerGui:GetChildren()) do
-            if gui.Name == "FTUEAuctionPrompt" then gui:Destroy() end
+            if gui.Name == "FTUEAuctionPrompt" then
+                gui:Destroy()
+            end
         end
     end)
 end
+
 local function stopPopupBlocker()
     task.delay(4, function()
-        if popupBlockerConn then popupBlockerConn:Disconnect(); popupBlockerConn = nil end
+        if popupBlockerConn then
+            popupBlockerConn:Disconnect()
+            popupBlockerConn = nil
+        end
     end)
 end
 
@@ -1135,26 +1025,26 @@ gemsBtn.MouseButton1Click:Connect(function()
         statusLabel.Text = "● Gems: OFF"
     end
 end)
--- Touch
-gemsBtn.Activated:Connect(function()
-    if isMobile then gemsBtn.MouseButton1Click:Fire() end
-end)
 
 local function showNotif(title, message, isError, checkboxRef)
     local t = themes[config.theme]
     local notif = Instance.new("Frame"); notif.Parent = gui
     notif.Size = UDim2.new(0, 260, 0, 70)
     notif.Position = UDim2.new(0, -270, 0, 120)
-    notif.BackgroundColor3 = t.primary; notif.BackgroundTransparency = 0.08
-    notif.BorderSizePixel = 0; notif.ZIndex = 100; notif.ClipsDescendants = true
+    notif.BackgroundColor3 = t.primary
+    notif.BackgroundTransparency = 0.08
+    notif.BorderSizePixel = 0; notif.ZIndex = 100
+    notif.ClipsDescendants = true
     local nc = Instance.new("UICorner", notif); nc.CornerRadius = UDim.new(0, 16)
     local ns = Instance.new("UIStroke", notif)
     ns.Color = isError and Color3.fromRGB(220,60,60) or t.stroke
     ns.Transparency = 0.5; ns.Thickness = 1.2
 
     local nbg = Instance.new("ImageLabel"); nbg.Parent = notif
-    nbg.Size = UDim2.new(1,0,1,0); nbg.BackgroundTransparency = 1
-    nbg.Image = bgImage and bgImage.Image or ""; nbg.ScaleType = Enum.ScaleType.Crop
+    nbg.Size = UDim2.new(1,0,1,0); nbg.Position = UDim2.new(0,0,0,0)
+    nbg.BackgroundTransparency = 1
+    nbg.Image = bgImage and bgImage.Image or ""
+    nbg.ScaleType = Enum.ScaleType.Crop
     nbg.ImageTransparency = 0.82; nbg.ZIndex = 100
     local nbgc = Instance.new("UICorner", nbg); nbgc.CornerRadius = UDim.new(0, 16)
 
@@ -1172,9 +1062,11 @@ local function showNotif(title, message, isError, checkboxRef)
     msgLbl.TextColor3 = t.text; msgLbl.TextWrapped = true
     msgLbl.TextXAlignment = Enum.TextXAlignment.Left; msgLbl.ZIndex = 102
 
-    tw(notif, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Position = UDim2.new(0, 12, 0, 120)})
+    tw(notif, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
+        {Position = UDim2.new(0, 12, 0, 120)})
     task.delay(3.5, function()
-        tw(notif, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {Position = UDim2.new(0, -270, 0, 120)})
+        tw(notif, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.In),
+            {Position = UDim2.new(0, -270, 0, 120)})
         task.delay(0.35, function() notif:Destroy() end)
     end)
 end
@@ -1186,24 +1078,33 @@ local heartsChkBox  = nil
 local heartsBtn, getHeartsState, heartsForceOff = checkbox(mainPage,"Collect Hearts", 64, false)
 heartsChkBox = checkBoxes[#checkBoxes]
 
-local function doHeartsToggle()
+heartsBtn.MouseButton1Click:Connect(function()
     if heartsActive then
-        heartsActive = false; heartsForceOff()
-        statusLabel.Text = "● Collect Hearts: OFF"; return
+        heartsActive = false
+        heartsForceOff()
+        statusLabel.Text = "● Collect Hearts: OFF"
+        return
     end
+
     local snowflakesFolder = workspace:FindFirstChild("Debris") and workspace.Debris:FindFirstChild("Snowflakes")
     local count = snowflakesFolder and #snowflakesFolder:GetChildren() or 0
+
     if count == 0 then
         heartsForceOff()
         showNotif("Collect Hearts", "No snowflakes active in the map!", true)
-        statusLabel.Text = "● Collect Hearts: Nothing found"; return
+        statusLabel.Text = "● Collect Hearts: Nothing found"
+        return
     end
+
     heartsActive = true
+
     local char = Players.LocalPlayer.Character
     local hrp  = char and char:FindFirstChild("HumanoidRootPart")
     if hrp then savedPosition = hrp.CFrame end
+
     showNotif("Collect Hearts", "Found " .. count .. " snowflakes! Teleporting...", false)
     statusLabel.Text = "● Collecting " .. count .. " snowflakes..."
+
     task.spawn(function()
         local flakes = snowflakesFolder:GetChildren()
         for _, flake in ipairs(flakes) do
@@ -1211,21 +1112,22 @@ local function doHeartsToggle()
             if flake and flake.Parent then
                 local c = Players.LocalPlayer.Character
                 local h = c and c:FindFirstChild("HumanoidRootPart")
-                if h then h.CFrame = flake.CFrame + Vector3.new(0, 3, 0); task.wait(0.15) end
+                if h then
+                    h.CFrame = flake.CFrame + Vector3.new(0, 3, 0)
+                    task.wait(0.15)
+                end
             end
         end
         task.wait(0.2)
         local c2 = Players.LocalPlayer.Character
         local h2 = c2 and c2:FindFirstChild("HumanoidRootPart")
         if h2 and savedPosition then h2.CFrame = savedPosition end
-        heartsActive = false; heartsForceOff()
+
+        heartsActive = false
+        heartsForceOff()
         statusLabel.Text = "● Collect Hearts: Done!"
     end)
-end
-
-heartsBtn.MouseButton1Click:Connect(doHeartsToggle)
-heartsBtn.Activated:Connect(function() if isMobile then doHeartsToggle() end end)
-
+end)
 secLabel(mainPage,"ACTIONS",106)
 
 local sliderRow, getSliderVal = slider(mainPage, "Gems Speed", 128, 10, 200, 10, function(val)
@@ -1235,10 +1137,11 @@ end)
 gemsSpamDelay = 1 / 10
 
 --====================================================
--- MICS PAGE
+-- LOCAL PLAYER PAGE
 --====================================================
 secLabel(micsPage,"MICS",0)
 
+-- CFly
 local cflyActive   = false
 local cflySpeed    = 50
 local cflyConn     = nil
@@ -1259,7 +1162,7 @@ local function stopCfly()
     if hum then hum.PlatformStand = false end
 end
 
-local function doCflyToggle()
+cflyBtn.MouseButton1Click:Connect(function()
     cflyActive = not cflyActive
     if cflyActive then
         statusLabel.Text = "● CFly: ON"
@@ -1268,20 +1171,29 @@ local function doCflyToggle()
         local hum  = char and char:FindFirstChildOfClass("Humanoid")
         if not hrp or not hum then
             cflyForceOff(); cflyActive = false
-            statusLabel.Text = "● CFly: No character"; return
+            statusLabel.Text = "● CFly: No character"
+            return
         end
+
         hum.PlatformStand = true
+
         cflyBodyVel = Instance.new("BodyVelocity"); cflyBodyVel.Parent = hrp
-        cflyBodyVel.Velocity = Vector3.zero; cflyBodyVel.MaxForce = Vector3.new(1e5,1e5,1e5)
+        cflyBodyVel.Velocity = Vector3.zero
+        cflyBodyVel.MaxForce = Vector3.new(1e5,1e5,1e5)
+
         cflyBodyGyro = Instance.new("BodyGyro"); cflyBodyGyro.Parent = hrp
-        cflyBodyGyro.MaxTorque = Vector3.new(1e5,1e5,1e5); cflyBodyGyro.P = 1e4
+        cflyBodyGyro.MaxTorque = Vector3.new(1e5,1e5,1e5)
+        cflyBodyGyro.P = 1e4
+
         cflyConn = RunService.Heartbeat:Connect(function()
-            local c2 = localPlayer.Character
-            local h2 = c2 and c2:FindFirstChild("HumanoidRootPart")
+            local c2  = localPlayer.Character
+            local h2  = c2 and c2:FindFirstChild("HumanoidRootPart")
             if not h2 then stopCfly(); cflyForceOff(); return end
+
             local cam = workspace.CurrentCamera
             local cf  = cam.CFrame
             local dir = Vector3.zero
+
             if UserInputService:IsKeyDown(Enum.KeyCode.W) then dir = dir + cf.LookVector end
             if UserInputService:IsKeyDown(Enum.KeyCode.S) then dir = dir - cf.LookVector end
             if UserInputService:IsKeyDown(Enum.KeyCode.A) then dir = dir - cf.RightVector end
@@ -1291,22 +1203,27 @@ local function doCflyToggle()
                UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then
                 dir = dir - Vector3.new(0,1,0)
             end
-            if dir.Magnitude > 0 then cflyBodyVel.Velocity = dir.Unit * cflySpeed
-            else cflyBodyVel.Velocity = Vector3.zero end
+
+            if dir.Magnitude > 0 then
+                cflyBodyVel.Velocity = dir.Unit * cflySpeed
+            else
+                cflyBodyVel.Velocity = Vector3.zero
+            end
+
             cflyBodyGyro.CFrame = cf
         end)
     else
-        stopCfly(); statusLabel.Text = "● CFly: OFF"
+        stopCfly()
+        statusLabel.Text = "● CFly: OFF"
     end
-end
-
-cflyBtn.MouseButton1Click:Connect(doCflyToggle)
-cflyBtn.Activated:Connect(function() if isMobile then doCflyToggle() end end)
-
-slider(micsPage, "Fly Speed", 64, 10, 300, 50, function(val)
-    cflySpeed = val; statusLabel.Text = "● Fly Speed: " .. tostring(math.floor(val))
 end)
 
+slider(micsPage, "Fly Speed", 64, 10, 300, 50, function(val)
+    cflySpeed = val
+    statusLabel.Text = "● Fly Speed: " .. tostring(math.floor(val))
+end)
+
+-- CWalk
 local cwalkActive = false
 local cwalkSpeed  = 32
 local cwalkConn   = nil
@@ -1321,7 +1238,7 @@ local function stopCwalk()
     if hum then hum.WalkSpeed = 16 end
 end
 
-local function doCwalkToggle()
+cwalkBtn.MouseButton1Click:Connect(function()
     cwalkActive = not cwalkActive
     if cwalkActive then
         statusLabel.Text = "● CWalk: ON"
@@ -1329,22 +1246,21 @@ local function doCwalkToggle()
         local hum  = char and char:FindFirstChildOfClass("Humanoid")
         if not hum then
             cwalkForceOff(); cwalkActive = false
-            statusLabel.Text = "● CWalk: No character"; return
+            statusLabel.Text = "● CWalk: No character"
+            return
         end
         hum.WalkSpeed = cwalkSpeed
         cwalkConn = RunService.Heartbeat:Connect(function()
-            local c2 = localPlayer.Character
-            local h2 = c2 and c2:FindFirstChildOfClass("Humanoid")
+            local c2  = localPlayer.Character
+            local h2  = c2 and c2:FindFirstChildOfClass("Humanoid")
             if not h2 then stopCwalk(); cwalkForceOff(); return end
             h2.WalkSpeed = cwalkSpeed
         end)
     else
-        stopCwalk(); statusLabel.Text = "● CWalk: OFF"
+        stopCwalk()
+        statusLabel.Text = "● CWalk: OFF"
     end
-end
-
-cwalkBtn.MouseButton1Click:Connect(doCwalkToggle)
-cwalkBtn.Activated:Connect(function() if isMobile then doCwalkToggle() end end)
+end)
 
 slider(micsPage, "Walk Speed", 164, 8, 150, 32, function(val)
     cwalkSpeed = val
@@ -1358,12 +1274,13 @@ end)
 
 secLabel(micsPage,"ABILITIES",222)
 
+-- Inf Jump
 local infJumpActive = false
 local infJumpConn   = nil
 
 local infJumpBtn, getInfJumpState, infJumpForceOff = checkbox(micsPage, "Inf Jump", 244, false)
 
-local function doInfJumpToggle()
+infJumpBtn.MouseButton1Click:Connect(function()
     infJumpActive = not infJumpActive
     if infJumpActive then
         statusLabel.Text = "● Inf Jump: ON"
@@ -1376,14 +1293,9 @@ local function doInfJumpToggle()
         if infJumpConn then infJumpConn:Disconnect(); infJumpConn = nil end
         statusLabel.Text = "● Inf Jump: OFF"
     end
-end
+end)
 
-infJumpBtn.MouseButton1Click:Connect(doInfJumpToggle)
-infJumpBtn.Activated:Connect(function() if isMobile then doInfJumpToggle() end end)
-
---====================================================
--- SETTINGS PAGE
---====================================================
+-- Settings page
 secLabel(settingsPage,"APPEARANCE",0)
 dropdown(settingsPage,"Theme",{"Default","Valentine","Snow"},config.theme,22,function(v) applyTheme(v) end)
 dropdown(settingsPage,"Font Style",{"Modern","Arcade","Rounded","Bold"},config.fontStyle,72,function(v) applyFont(v) end)
@@ -1418,7 +1330,8 @@ applyBgBtn.Text="Apply"; applyBgBtn.Font=Enum.Font.GothamBold; applyBgBtn.TextSi
 applyBgBtn.TextColor3=themes[config.theme].primary; applyBgBtn.BackgroundColor3=themes[config.theme].accent
 applyBgBtn.AutoButtonColor=false; applyBgBtn.ZIndex=6
 local abc=Instance.new("UICorner",applyBgBtn); abc.CornerRadius=UDim.new(0,10)
-applyBgBtn.Activated:Connect(function()
+
+applyBgBtn.MouseButton1Click:Connect(function()
     local id=bgInput.Text:match("%d+") or "108458500083995"
     bgImage.Image="rbxassetid://"..id; config.bgImageId=id; saveConfig(config)
     statusLabel.Text="● Background updated!"
@@ -1427,13 +1340,11 @@ applyBgBtn.Activated:Connect(function()
 end)
 
 local removeBg=actionButton(settingsPage,"Remove Background",210)
-removeBg.Activated:Connect(function()
+removeBg.MouseButton1Click:Connect(function()
     bgImage.Image=""; config.bgImageId=""; saveConfig(config); statusLabel.Text="● Background removed"
 end)
 
---====================================================
--- TELEPORTS PAGE
---====================================================
+-- Teleports page
 local teleportSpots = {
     { name="Item Grading",      pos=Vector3.new(-425.40, 214.89, 1969.09) },
     { name="Warehouse",         pos=Vector3.new(-320.06, 213.16, 1967.06) },
@@ -1453,9 +1364,9 @@ local teleportSpots = {
 secLabel(teleportsPage,"TELEPORTS",0)
 
 for i, spot in ipairs(teleportSpots) do
-    local yp = 22 + (i-1)*(ROW_H+6)
+    local yp = 22 + (i-1)*44
     local btn = actionButton(teleportsPage, spot.name, yp)
-    btn.Activated:Connect(function()
+    btn.MouseButton1Click:Connect(function()
         local char = Players.LocalPlayer.Character
         local hrp  = char and char:FindFirstChild("HumanoidRootPart")
         if hrp then
@@ -1468,13 +1379,13 @@ for i, spot in ipairs(teleportSpots) do
 end
 
 --====================================================
--- TABS
+-- TABS  (Main · Local Player · Teleports · Settings)
 --====================================================
 tabData={
-    {name="Main",      icon="⬡", page=mainPage,      isImage=true},
-    {name="Mics",      icon="👤", page=micsPage,      isImage=true},
-    {name="Teleports", icon="✈", page=teleportsPage, isImage=true},
-    {name="Settings",  icon="⚙", page=settingsPage,  isImage=true},
+    {name="Main",      icon="⬡", page=mainPage,     isImage=true},
+    {name="Mics",      icon="👤", page=micsPage,     isImage=true},
+    {name="Teleports", icon="✈", page=teleportsPage,isImage=true},
+    {name="Settings",  icon="⚙", page=settingsPage, isImage=true},
 }
 tabBtns={}
 local activeTabIdx=nil
@@ -1490,7 +1401,8 @@ local function switchTab(idx)
         tw(out, TweenInfo.new(0.2, Enum.EasingStyle.Quint, Enum.EasingDirection.In),
             {Position = UDim2.new(dir * 0.07, 0, 0, 0)})
         task.delay(0.2, function()
-            out.Visible = false; out.Position = UDim2.new(0, 0, 0, 0)
+            out.Visible = false
+            out.Position = UDim2.new(0, 0, 0, 0)
         end)
     end
 
@@ -1508,7 +1420,7 @@ local function switchTab(idx)
         tw(tb.bg, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
             {BackgroundColor3 = on and t.accent or t.row,
              BackgroundTransparency = on and 0 or 0.55,
-             Size = on and UDim2.new(1,-10,0,TAB_H) or UDim2.new(1,-16,0,TAB_H)})
+             Size = on and UDim2.new(1,-10,0,44) or UDim2.new(1,-16,0,44)})
         tw(tb.lbl, T_FAST, {TextColor3 = on and t.primary or t.text})
         if tb.isImage then
             tw(tb.ico, T_FAST, {ImageColor3 = on and t.primary or t.subtext})
@@ -1516,13 +1428,14 @@ local function switchTab(idx)
             tw(tb.ico, T_FAST, {TextColor3 = on and t.primary or t.subtext})
         end
     end
+
     activeTabIdx = idx
 end
 
 for i,data in ipairs(tabData) do
-    local yp = 14 + (i-1)*TAB_GAP
+    local yp=14+(i-1)*54
     local tbg=Instance.new("Frame"); tbg.Parent=sidebar
-    tbg.Size=UDim2.new(1,-16,0,TAB_H); tbg.Position=UDim2.new(0,8,0,yp)
+    tbg.Size=UDim2.new(1,-16,0,44); tbg.Position=UDim2.new(0,8,0,yp)
     tbg.BackgroundColor3=themes[config.theme].row; tbg.BackgroundTransparency=0.55
     tbg.BorderSizePixel=0; tbg.ZIndex=5
     local tc=Instance.new("UICorner",tbg); tc.CornerRadius=UDim.new(0,14)
@@ -1531,28 +1444,43 @@ for i,data in ipairs(tabData) do
 
     local tico
     if data.isImage then
-        tico = Instance.new("ImageLabel"); tico.Name = data.name.."Icon"; tico.Parent = tbg
-        tico.Size = UDim2.new(0, isMobile and 14 or 16, 0, isMobile and 14 or 16)
-        tico.Position = UDim2.new(0, 10, 0.5, isMobile and -7 or -8)
-        tico.BackgroundTransparency = 1; tico.ScaleType = Enum.ScaleType.Fit
-        tico.ImageColor3 = themes[config.theme].subtext; tico.ZIndex = 6
-        if data.name == "Main"      then tico.Image = "rbxassetid://" .. themes[config.theme].mainTabIcon end
-        if data.name == "Mics"      then tico.Image = "rbxassetid://" .. themes[config.theme].micsTabIcon end
-        if data.name == "Teleports" then tico.Image = "rbxassetid://" .. themes[config.theme].teleportTabIcon end
-        if data.name == "Settings"  then tico.Image = "rbxassetid://" .. themes[config.theme].settingsTabIcon end
+        tico = Instance.new("ImageLabel")
+        tico.Name = data.name .. "Icon"
+        tico.Parent = tbg
+        tico.Size = UDim2.new(0, 16, 0, 16)
+        tico.Position = UDim2.new(0, 12, 0.5, -8)
+        tico.BackgroundTransparency = 1
+        tico.ScaleType = Enum.ScaleType.Fit
+        tico.ImageColor3 = themes[config.theme].subtext
+        tico.ZIndex = 6
+        -- assign icon image per tab
+        if data.name == "Main" then
+            tico.Image = "rbxassetid://" .. themes[config.theme].mainTabIcon
+        elseif data.name == "Mics" then
+            tico.Image = "rbxassetid://" .. themes[config.theme].micsTabIcon
+        elseif data.name == "Teleports" then
+            tico.Image = "rbxassetid://" .. themes[config.theme].teleportTabIcon
+        elseif data.name == "Settings" then
+            tico.Image = "rbxassetid://" .. themes[config.theme].settingsTabIcon
+        end
     else
-        tico = Instance.new("TextLabel"); tico.Parent = tbg
-        tico.Size = UDim2.new(0, 22, 1, 0); tico.Position = UDim2.new(0, 8, 0, 0)
-        tico.BackgroundTransparency = 1; tico.Text = data.icon
-        tico.Font = Enum.Font.GothamBold; tico.TextSize = isMobile and 12 or 14
-        tico.TextColor3 = themes[config.theme].subtext; tico.ZIndex = 6
+        tico = Instance.new("TextLabel")
+        tico.Parent = tbg
+        tico.Size = UDim2.new(0, 22, 1, 0)
+        tico.Position = UDim2.new(0, 10, 0, 0)
+        tico.BackgroundTransparency = 1
+        tico.Text = data.icon
+        tico.Font = Enum.Font.GothamBold
+        tico.TextSize = 14
+        tico.TextColor3 = themes[config.theme].subtext
+        tico.ZIndex = 6
         table.insert(textSub, tico)
     end
 
     local tlbl=Instance.new("TextLabel"); tlbl.Parent=tbg
-    tlbl.Size=UDim2.new(1,-30,1,0); tlbl.Position=UDim2.new(0, isMobile and 28 or 32, 0,0)
+    tlbl.Size=UDim2.new(1,-34,1,0); tlbl.Position=UDim2.new(0,32,0,0)
     tlbl.BackgroundTransparency=1; tlbl.Text=data.name
-    tlbl.Font=fonts[config.fontStyle] or Enum.Font.GothamBold; tlbl.TextSize=FONT_MAIN
+    tlbl.Font=fonts[config.fontStyle] or Enum.Font.GothamBold; tlbl.TextSize=12
     tlbl.TextColor3=themes[config.theme].text; tlbl.TextXAlignment=Enum.TextXAlignment.Left; tlbl.ZIndex=6
     table.insert(textMain,tlbl); table.insert(fontObjs,tlbl)
 
@@ -1562,7 +1490,7 @@ for i,data in ipairs(tabData) do
 
     tbtn.MouseEnter:Connect(function() if activeTabIdx~=i then tw(tbg,T_FAST,{BackgroundTransparency=0.25}) end end)
     tbtn.MouseLeave:Connect(function() if activeTabIdx~=i then tw(tbg,T_FAST,{BackgroundTransparency=0.55}) end end)
-    tbtn.Activated:Connect(function() switchTab(i) end)
+    tbtn.MouseButton1Click:Connect(function() switchTab(i) end)
 end
 
 --====================================================
@@ -1574,11 +1502,48 @@ applyFont(config.fontStyle)
 if config.bgImageId and config.bgImageId~="" then
     bgImage.Image="rbxassetid://"..config.bgImageId
 end
+
 updateCanvasSize(mainPage)
+
+--====================================================
+-- DRAG
+--====================================================
+local dragging,dragStart,startPos=false,nil,nil
+root.InputBegan:Connect(function(inp)
+    if inp.UserInputType==Enum.UserInputType.MouseButton1 then
+        if activeSlider then return end
+
+        local sliderActive = false
+        for _,s in ipairs(sliderObjs) do
+            if s.track and s.track.Parent then
+                local ap = s.track.AbsolutePosition
+                local as = s.track.AbsoluteSize
+                local mp = inp.Position
+                if mp.X >= ap.X - 8 and mp.X <= ap.X + as.X + 8 and
+                   mp.Y >= ap.Y - 20 and mp.Y <= ap.Y + as.Y + 20 then
+                    sliderActive = true
+                    break
+                end
+            end
+        end
+        if sliderActive then return end
+
+        dragging=true; dragStart=inp.Position; startPos=root.Position
+        local c; c=inp.Changed:Connect(function()
+            if inp.UserInputState==Enum.UserInputState.End then dragging=false; c:Disconnect() end
+        end)
+    end
+end)
+UserInputService.InputChanged:Connect(function(inp)
+    if dragging and inp.UserInputType==Enum.UserInputType.MouseMovement then
+        local d=inp.Position-dragStart
+        root.Position=UDim2.new(startPos.X.Scale,startPos.X.Offset+d.X,startPos.Y.Scale,startPos.Y.Offset+d.Y)
+    end
+end)
 
 --====================================================
 -- ENTRANCE
 --====================================================
 root.Size=UDim2.new(0,0,0,0)
-tw(root,TweenInfo.new(0.5,Enum.EasingStyle.Back,Enum.EasingDirection.Out),{Size=UDim2.new(0,UI_W,0,UI_H)})
-print("MultiTool UI v6.0 loaded! Mobile:", isMobile)
+tw(root,TweenInfo.new(0.5,Enum.EasingStyle.Back,Enum.EasingDirection.Out),{Size=UDim2.new(0,500,0,390)})
+print("MultiTool UI v6.0 loaded!")
