@@ -1,5 +1,5 @@
 --====================================================
--- WH01 UI — Mobile + PC Friendly (FIXED CHECKBOX MOBILE)
+-- WH01 UI — Mobile + PC Friendly
 --====================================================
 
 local Players          = game:GetService("Players")
@@ -798,14 +798,13 @@ local function checkbox(parent,text,yp,defaultOn)
     lbl.TextColor3=t.text; lbl.TextXAlignment=Enum.TextXAlignment.Left; lbl.ZIndex=6
     table.insert(textMain,lbl); table.insert(fontObjs,lbl)
 
-    -- CHECKBOX BOX — Aumentado de 22 a 24 para mejor visibilidad en mobile
+    -- CAMBIO VISUAL MINIMAL: Solo tamaño y TextSize del checkmark
     local box=Instance.new("Frame"); box.Parent=row
     box.Size=UDim2.new(0,24,0,24); box.Position=UDim2.new(1,-36,0.5,-12)
     box.BackgroundColor3=state and t.accent or t.row; box.BorderSizePixel=0; box.ZIndex=6
-    local bc2=Instance.new("UICorner",box); bc2.CornerRadius=UDim.new(0,8)
+    local bc2=Instance.new("UICorner",box); bc2.CornerRadius=UDim.new(0,7)
     local bs=Instance.new("UIStroke",box); bs.Color=t.stroke; bs.Transparency=0.7
 
-    -- CHECKMARK — Reducido de 13 a 11 para que quepa mejor
     local chk=Instance.new("TextLabel"); chk.Parent=box
     chk.Size=UDim2.fromScale(1,1); chk.BackgroundTransparency=1
     chk.Text="✓"; chk.Font=Enum.Font.GothamBold; chk.TextSize=11
@@ -815,32 +814,22 @@ local function checkbox(parent,text,yp,defaultOn)
     local overridden = false
     local btn=Instance.new("TextButton"); btn.Parent=row
     btn.Size=UDim2.fromScale(1,1); btn.BackgroundTransparency=1; btn.Text=""; btn.ZIndex=8
-    
-    -- Efectos hover solo para desktop
-    if not isMobile then
-        btn.MouseEnter:Connect(function()
-            tw(row,T_FAST,{BackgroundColor3=themes[config.theme].accent, BackgroundTransparency=0.4})
-            tw(lbl,T_FAST,{TextColor3=themes[config.theme].primary})
-        end)
-        btn.MouseLeave:Connect(function()
-            tw(row,T_FAST,{BackgroundColor3=themes[config.theme].row, BackgroundTransparency=0.2})
-            tw(lbl,T_FAST,{TextColor3=themes[config.theme].text})
-        end)
-        btn.MouseButton1Click:Connect(function()
-            if overridden then overridden=false; return end
-            state=not state; chk.Visible=state
-            tw(box,T_FAST,{BackgroundColor3=state and themes[config.theme].accent or themes[config.theme].row})
-            statusLabel.Text="● "..text..": "..(state and "ON" or "OFF")
-        end)
-    end
-    
-    -- Touch/Activated para mobile (sin hover, más directo)
-    btn.Activated:Connect(function()
+    btn.MouseEnter:Connect(function()
+        tw(row,T_FAST,{BackgroundColor3=themes[config.theme].accent, BackgroundTransparency=0.4})
+        tw(lbl,T_FAST,{TextColor3=themes[config.theme].primary})
+    end)
+    btn.MouseLeave:Connect(function()
+        tw(row,T_FAST,{BackgroundColor3=themes[config.theme].row, BackgroundTransparency=0.2})
+        tw(lbl,T_FAST,{TextColor3=themes[config.theme].text})
+    end)
+    local function toggleCheckbox()
         if overridden then overridden=false; return end
         state=not state; chk.Visible=state
         tw(box,T_FAST,{BackgroundColor3=state and themes[config.theme].accent or themes[config.theme].row})
         statusLabel.Text="● "..text..": "..(state and "ON" or "OFF")
-    end)
+    end
+    btn.MouseButton1Click:Connect(toggleCheckbox)
+    btn.Activated:Connect(function() if isMobile then toggleCheckbox() end end)
 
     local function forceOff()
         if state then overridden = true end
@@ -970,22 +959,20 @@ local function slider(parent, labelText, yp, minVal, maxVal, defaultVal, onChang
         end
     end)
 
-    if not isMobile then
-        trackBtn.MouseEnter:Connect(function()
-            tw(knob, T_FAST, {Size = UDim2.new(0, KNOB_SIZE+2, 0, KNOB_SIZE+2)})
-            tw(row, T_FAST, {BackgroundColor3=themes[config.theme].accent, BackgroundTransparency=0.4})
-            tw(nameLbl, T_FAST, {TextColor3=themes[config.theme].primary})
-            tw(valLbl, T_FAST, {TextColor3=themes[config.theme].primary})
-        end)
-        trackBtn.MouseLeave:Connect(function()
-            if not activeSlider then
-                tw(knob, T_FAST, {Size = UDim2.new(0, KNOB_SIZE, 0, KNOB_SIZE)})
-                tw(row, T_FAST, {BackgroundColor3=themes[config.theme].row, BackgroundTransparency=0.2})
-                tw(nameLbl, T_FAST, {TextColor3=themes[config.theme].text})
-                tw(valLbl, T_FAST, {TextColor3=themes[config.theme].accent})
-            end
-        end)
-    end
+    trackBtn.MouseEnter:Connect(function()
+        tw(knob, T_FAST, {Size = UDim2.new(0, KNOB_SIZE+2, 0, KNOB_SIZE+2)})
+        tw(row, T_FAST, {BackgroundColor3=themes[config.theme].accent, BackgroundTransparency=0.4})
+        tw(nameLbl, T_FAST, {TextColor3=themes[config.theme].primary})
+        tw(valLbl, T_FAST, {TextColor3=themes[config.theme].primary})
+    end)
+    trackBtn.MouseLeave:Connect(function()
+        if not activeSlider then
+            tw(knob, T_FAST, {Size = UDim2.new(0, KNOB_SIZE, 0, KNOB_SIZE)})
+            tw(row, T_FAST, {BackgroundColor3=themes[config.theme].row, BackgroundTransparency=0.2})
+            tw(nameLbl, T_FAST, {TextColor3=themes[config.theme].text})
+            tw(valLbl, T_FAST, {TextColor3=themes[config.theme].accent})
+        end
+    end)
 
     return row, function() return currentVal end, updateSlider
 end
@@ -1013,21 +1000,18 @@ local function actionButton(parent,text,yp)
     arr.TextSize=14; arr.TextColor3=t.subtext; arr.ZIndex=6
     table.insert(textSub,arr)
 
-    if not isMobile then
-        btn.MouseEnter:Connect(function()
-            tw(btn,T_FAST,{BackgroundColor3=themes[config.theme].accent, BackgroundTransparency=0.4})
-            tw(lbl,T_FAST,{TextColor3=themes[config.theme].primary})
-            tw(arr,T_FAST,{TextColor3=themes[config.theme].primary,Position=UDim2.new(1,-23,0.5,-10)})
-        end)
-        btn.MouseLeave:Connect(function()
-            tw(btn,T_FAST,{BackgroundColor3=themes[config.theme].row, BackgroundTransparency=0.2})
-            tw(lbl,T_FAST,{TextColor3=themes[config.theme].text})
-            tw(arr,T_FAST,{TextColor3=themes[config.theme].subtext,Position=UDim2.new(1,-28,0.5,-10)})
-        end)
-        btn.MouseButton1Down:Connect(function() tw(btn,TweenInfo.new(0.1),{Size=UDim2.new(1,-4,0,ROW_H-2)}) end)
-        btn.MouseButton1Up:Connect(function()   tw(btn,TweenInfo.new(0.1),{Size=UDim2.new(1,0,0,ROW_H)}) end)
-    end
-    
+    btn.MouseEnter:Connect(function()
+        tw(btn,T_FAST,{BackgroundColor3=themes[config.theme].accent, BackgroundTransparency=0.4})
+        tw(lbl,T_FAST,{TextColor3=themes[config.theme].primary})
+        tw(arr,T_FAST,{TextColor3=themes[config.theme].primary,Position=UDim2.new(1,-23,0.5,-10)})
+    end)
+    btn.MouseLeave:Connect(function()
+        tw(btn,T_FAST,{BackgroundColor3=themes[config.theme].row, BackgroundTransparency=0.2})
+        tw(lbl,T_FAST,{TextColor3=themes[config.theme].text})
+        tw(arr,T_FAST,{TextColor3=themes[config.theme].subtext,Position=UDim2.new(1,-28,0.5,-10)})
+    end)
+    btn.MouseButton1Down:Connect(function() tw(btn,TweenInfo.new(0.1),{Size=UDim2.new(1,-4,0,ROW_H-2)}) end)
+    btn.MouseButton1Up:Connect(function()   tw(btn,TweenInfo.new(0.1),{Size=UDim2.new(1,0,0,ROW_H)}) end)
     -- Touch feedback
     btn.TouchLongPress:Connect(function() tw(btn,TweenInfo.new(0.1),{Size=UDim2.new(1,-4,0,ROW_H-2)}) end)
     return btn
@@ -1084,18 +1068,14 @@ local function dropdown(parent,labelText,options,currentVal,yp,onChange)
         ob.AutoButtonColor=false; ob.ZIndex=21
         local obc=Instance.new("UICorner",ob); obc.CornerRadius=UDim.new(0,10)
         table.insert(fontObjs,ob)
-        
-        if not isMobile then
-            ob.MouseEnter:Connect(function() tw(ob,T_FAST,{BackgroundTransparency=0.3}) end)
-            ob.MouseLeave:Connect(function() tw(ob,T_FAST,{BackgroundTransparency=(ob.Text==vl.Text) and 0.4 or 0.85}) end)
-        end
-        
+        ob.MouseEnter:Connect(function() tw(ob,T_FAST,{BackgroundTransparency=0.3}) end)
+        ob.MouseLeave:Connect(function() tw(ob,T_FAST,{BackgroundTransparency=(ob.Text==vl.Text) and 0.4 or 0.85}) end)
         local function selectOpt()
             vl.Text=opt; dl.Visible=false; activeDD=nil; tw(al,T_FAST,{Rotation=0})
             onChange(opt); statusLabel.Text="● "..labelText..": "..opt
         end
         ob.MouseButton1Click:Connect(selectOpt)
-        ob.Activated:Connect(function() selectOpt() end)
+        ob.Activated:Connect(function() if isMobile then selectOpt() end end)
     end
 
     local tb=Instance.new("TextButton"); tb.Parent=mr
@@ -1106,7 +1086,7 @@ local function dropdown(parent,labelText,options,currentVal,yp,onChange)
         tw(al,T_FAST,{Rotation=dl.Visible and 180 or 0})
     end
     tb.MouseButton1Click:Connect(toggleDD)
-    tb.Activated:Connect(toggleDD)
+    tb.Activated:Connect(function() if isMobile then toggleDD() end end)
     return cont
 end
 
@@ -1154,23 +1134,7 @@ gemsBtn.MouseButton1Click:Connect(function()
 end)
 -- Touch
 gemsBtn.Activated:Connect(function()
-    gemsActive = not gemsActive
-    if gemsActive then
-        statusLabel.Text = "● Gems: FARMING..."
-        startPopupBlocker()
-        task.spawn(function()
-            while gemsActive do
-                pcall(function()
-                    local evt = game:GetService("ReplicatedStorage").Events.Tutorial.EndTutorial
-                    safeFireServer(evt)
-                end)
-                rWait(gemsSpamDelay)
-            end
-        end)
-    else
-        stopPopupBlocker()
-        statusLabel.Text = "● Gems: OFF"
-    end
+    if isMobile then gemsBtn.MouseButton1Click:Fire() end
 end)
 
 local function showNotif(title, message, isError, checkboxRef)
@@ -1257,7 +1221,7 @@ local function doHeartsToggle()
 end
 
 heartsBtn.MouseButton1Click:Connect(doHeartsToggle)
-heartsBtn.Activated:Connect(doHeartsToggle)
+heartsBtn.Activated:Connect(function() if isMobile then doHeartsToggle() end end)
 
 secLabel(mainPage,"ACTIONS",106)
 
@@ -1334,7 +1298,7 @@ local function doCflyToggle()
 end
 
 cflyBtn.MouseButton1Click:Connect(doCflyToggle)
-cflyBtn.Activated:Connect(doCflyToggle)
+cflyBtn.Activated:Connect(function() if isMobile then doCflyToggle() end end)
 
 slider(micsPage, "Fly Speed", 64, 10, 300, 50, function(val)
     cflySpeed = val; statusLabel.Text = "● Fly Speed: " .. tostring(math.floor(val))
@@ -1377,7 +1341,7 @@ local function doCwalkToggle()
 end
 
 cwalkBtn.MouseButton1Click:Connect(doCwalkToggle)
-cwalkBtn.Activated:Connect(doCwalkToggle)
+cwalkBtn.Activated:Connect(function() if isMobile then doCwalkToggle() end end)
 
 slider(micsPage, "Walk Speed", 164, 8, 150, 32, function(val)
     cwalkSpeed = val
@@ -1412,7 +1376,7 @@ local function doInfJumpToggle()
 end
 
 infJumpBtn.MouseButton1Click:Connect(doInfJumpToggle)
-infJumpBtn.Activated:Connect(doInfJumpToggle)
+infJumpBtn.Activated:Connect(function() if isMobile then doInfJumpToggle() end end)
 
 --====================================================
 -- SETTINGS PAGE
@@ -1593,10 +1557,8 @@ for i,data in ipairs(tabData) do
     tbtn.Size=UDim2.fromScale(1,1); tbtn.BackgroundTransparency=1; tbtn.Text=""; tbtn.ZIndex=7
     tabBtns[i]={bg=tbg,lbl=tlbl,ico=tico,isImage=data.isImage}
 
-    if not isMobile then
-        tbtn.MouseEnter:Connect(function() if activeTabIdx~=i then tw(tbg,T_FAST,{BackgroundTransparency=0.25}) end end)
-        tbtn.MouseLeave:Connect(function() if activeTabIdx~=i then tw(tbg,T_FAST,{BackgroundTransparency=0.55}) end end)
-    end
+    tbtn.MouseEnter:Connect(function() if activeTabIdx~=i then tw(tbg,T_FAST,{BackgroundTransparency=0.25}) end end)
+    tbtn.MouseLeave:Connect(function() if activeTabIdx~=i then tw(tbg,T_FAST,{BackgroundTransparency=0.55}) end end)
     tbtn.Activated:Connect(function() switchTab(i) end)
 end
 
@@ -1616,4 +1578,4 @@ updateCanvasSize(mainPage)
 --====================================================
 root.Size=UDim2.new(0,0,0,0)
 tw(root,TweenInfo.new(0.5,Enum.EasingStyle.Back,Enum.EasingDirection.Out),{Size=UDim2.new(0,UI_W,0,UI_H)})
-print("MultiTool UI v6.0 FIXED loaded! Mobile:", isMobile)
+print("MultiTool UI v6.0 loaded! Mobile:", isMobile)
