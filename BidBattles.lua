@@ -246,91 +246,93 @@ end)
 --====================================================
 -- DRAG — Mouse Y Touch, con prioridad a sliders
 --====================================================
-local dragging   = false
-local dragStart  = nil
-local startPos   = nil
+local function setupDrag()
+    local dragging   = false
+    local dragStart  = nil
+    local startPos   = nil
 
--- Detecta si un punto de pantalla está sobre algún slider
-local function isOverSlider(screenPos)
-    for _, s in ipairs(sliderObjs) do
-        if s.track and s.track.Parent then
-            local ap = s.track.AbsolutePosition
-            local as = s.track.AbsoluteSize
-            -- zona generosa alrededor del track
-            if screenPos.X >= ap.X - 10 and screenPos.X <= ap.X + as.X + 10 and
-               screenPos.Y >= ap.Y - 24  and screenPos.Y <= ap.Y + as.Y + 24 then
-                return true
+    -- Detecta si un punto de pantalla está sobre algún slider
+    local function isOverSlider(screenPos)
+        for _, s in ipairs(sliderObjs) do
+            if s.track and s.track.Parent then
+                local ap = s.track.AbsolutePosition
+                local as = s.track.AbsoluteSize
+                -- zona generosa alrededor del track
+                if screenPos.X >= ap.X - 10 and screenPos.X <= ap.X + as.X + 10 and
+                   screenPos.Y >= ap.Y - 24  and screenPos.Y <= ap.Y + as.Y + 24 then
+                    return true
+                end
             end
         end
+        return false
     end
-    return false
-end
 
--- MOUSE drag
-root.InputBegan:Connect(function(inp)
-    if inp.UserInputType == Enum.UserInputType.MouseButton1 then
-        if activeSlider then return end
-        if isOverSlider(inp.Position) then return end
-        dragging  = true
-        dragStart = inp.Position
-        startPos  = root.Position
-        local c; c = inp.Changed:Connect(function()
-            if inp.UserInputState == Enum.UserInputState.End then
-                dragging = false
-                c:Disconnect()
+    -- MOUSE drag
+    root.InputBegan:Connect(function(inp)
+        if inp.UserInputType == Enum.UserInputType.MouseButton1 then
+            if activeSlider then return end
+            if isOverSlider(inp.Position) then return end
+            dragging  = true
+            dragStart = inp.Position
+            startPos  = root.Position
+            local c; c = inp.Changed:Connect(function()
+                if inp.UserInputState == Enum.UserInputState.End then
+                    dragging = false
+                    c:Disconnect()
+                end
+            end)
+        end
+    end)
+
+    UserInputService.InputChanged:Connect(function(inp)
+        if dragging and inp.UserInputType == Enum.UserInputType.MouseMovement then
+            local d = inp.Position - dragStart
+            root.Position = UDim2.new(
+                startPos.X.Scale, startPos.X.Offset + d.X,
+                startPos.Y.Scale, startPos.Y.Offset + d.Y
+            )
+        end
+    end)
+
+    -- TOUCH drag
+    local touchDragId = nil
+
+    root.InputBegan:Connect(function(inp)
+        if inp.UserInputType == Enum.UserInputType.Touch then
+            -- Si hay un slider activo, no iniciar drag
+            if activeSlider then return end
+            if isOverSlider(inp.Position) then return end
+
+            touchDragId = inp
+            dragging    = true
+            dragStart   = inp.Position
+            startPos    = root.Position
+        end
+    end)
+
+    root.InputChanged:Connect(function(inp)
+        if dragging and inp == touchDragId and inp.UserInputType == Enum.UserInputType.Touch then
+            if activeSlider then
+                -- si mientras draggeas activaste un slider, cancela el drag
+                dragging    = false
+                touchDragId = nil
+                return
             end
-        end)
-    end
-end)
+            local d = inp.Position - dragStart
+            root.Position = UDim2.new(
+                startPos.X.Scale, startPos.X.Offset + d.X,
+                startPos.Y.Scale, startPos.Y.Offset + d.Y
+            )
+        end
+    end)
 
-UserInputService.InputChanged:Connect(function(inp)
-    if dragging and inp.UserInputType == Enum.UserInputType.MouseMovement then
-        local d = inp.Position - dragStart
-        root.Position = UDim2.new(
-            startPos.X.Scale, startPos.X.Offset + d.X,
-            startPos.Y.Scale, startPos.Y.Offset + d.Y
-        )
-    end
-end)
-
--- TOUCH drag
-local touchDragId = nil
-
-root.InputBegan:Connect(function(inp)
-    if inp.UserInputType == Enum.UserInputType.Touch then
-        -- Si hay un slider activo, no iniciar drag
-        if activeSlider then return end
-        if isOverSlider(inp.Position) then return end
-
-        touchDragId = inp
-        dragging    = true
-        dragStart   = inp.Position
-        startPos    = root.Position
-    end
-end)
-
-root.InputChanged:Connect(function(inp)
-    if dragging and inp == touchDragId and inp.UserInputType == Enum.UserInputType.Touch then
-        if activeSlider then
-            -- si mientras draggeas activaste un slider, cancela el drag
+    root.InputEnded:Connect(function(inp)
+        if inp == touchDragId then
             dragging    = false
             touchDragId = nil
-            return
         end
-        local d = inp.Position - dragStart
-        root.Position = UDim2.new(
-            startPos.X.Scale, startPos.X.Offset + d.X,
-            startPos.Y.Scale, startPos.Y.Offset + d.Y
-        )
-    end
-end)
-
-root.InputEnded:Connect(function(inp)
-    if inp == touchDragId then
-        dragging    = false
-        touchDragId = nil
-    end
-end)
+    end)
+end
 
 --====================================================
 -- PARTICLES
@@ -549,6 +551,8 @@ bgImage.ImageTransparency = 0.82
 bgImage.ZIndex = 1
 bgImage.ClipsDescendants = true
 local bic = Instance.new("UICorner"); bic.CornerRadius = UDim.new(0, 24); bic.Parent = bgImage
+
+setupDrag()
 
 --====================================================
 -- HEADER
